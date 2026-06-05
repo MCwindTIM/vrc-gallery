@@ -1,0 +1,24 @@
+{
+  "name": "vrc-gallery",
+  "private": true,
+  "version": "2.0.0",
+  "description": "土豆 VRChat photo gallery",
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "npm run build -w client",
+    "build:server": "npm run build -w server",
+    "prestart": "npm run sync-photos:prod -w server",
+    "start": "npm run start -w server",
+    "prod": "npm run build && npm run start",
+    "sync-photos": "npm run sync-photos -w server",
+    "sync-photos:prod": "npm run sync-photos:prod -w server"
+  },
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

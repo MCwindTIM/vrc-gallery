@@ -1,0 +1,10 @@
+node_modules/
+dist/
+client/dist/
+server/dist/
+data/photos.json
+.env
+photos/
+*.log
+.DS_Store
+npm-debug.log*

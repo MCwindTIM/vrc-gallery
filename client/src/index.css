@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+@theme {
+  --font-handwritten: "Klee One", "Zen Kurenaido", cursive;
+  --font-ui: "Noto Sans TC", system-ui, sans-serif;
+  --color-void: #fff8fc;
+  --color-surface: #fff1f7;
+  --color-panel: #ffffff;
+  --color-border: #f5d0e3;
+  --color-muted: #a67f92;
+  --color-text: #5c3d55;
+  --color-accent: #ff85b3;
+  --color-accent-2: #7ec8ef;
+  --color-glow: #ffc8e0;
+  --color-on-accent: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  font-family: var(--font-handwritten);
+  background: var(--color-void);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+.font-ui {
+  font-family: var(--font-ui);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  color: var(--color-text);
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.mesh-bg {
+  background:
+    radial-gradient(
+      ellipse 80% 50% at 15% -5%,
+      color-mix(in srgb, var(--color-accent) 28%, transparent),
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 65% 45% at 92% 8%,
+      color-mix(in srgb, var(--color-accent-2) 26%, transparent),
+      transparent 52%
+    ),
+    radial-gradient(
+      ellipse 55% 35% at 50% 100%,
+      color-mix(in srgb, var(--color-glow) 32%, transparent),
+      transparent 48%
+    ),
+    var(--color-void);
+}
+
+.grid-overlay {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--color-border) 55%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-border) 55%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, black 0%, transparent 85%);
+}
