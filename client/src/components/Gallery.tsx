@@ -10,6 +10,7 @@ import type { GalleryStats } from "../types";
 interface GalleryProps {
   stats: GalleryStats | null;
   photos: Photo[];
+  photoTotal: number;
   month: string | null;
   setMonth: (m: string | null) => void;
   loading: boolean;
@@ -22,6 +23,7 @@ interface GalleryProps {
 export function Gallery({
   stats,
   photos,
+  photoTotal,
   month,
   setMonth,
   loading,
@@ -58,7 +60,7 @@ export function Gallery({
               回憶收藏館
             </h2>
             <p className="mt-2 text-[var(--color-muted)]">
-              {stats ? `${stats.total} 張照片` : "載入中…"}
+              {loading ? "載入中…" : `${photoTotal} 張照片`}
             </p>
           </div>
           {stats && (

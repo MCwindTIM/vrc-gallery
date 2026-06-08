@@ -13,6 +13,7 @@ export function useGallery() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [photoTotal, setPhotoTotal] = useState(0);
 
   const loadStats = useCallback(async () => {
     const data = await fetchStats();
@@ -29,6 +30,7 @@ export function useGallery() {
       setPhotos((prev) =>
         replace ? data.photos : [...prev, ...data.photos]
       );
+      setPhotoTotal(data.total);
       setHasMore(data.hasMore);
       setPage(pageNum);
     },
@@ -69,6 +71,7 @@ export function useGallery() {
   return {
     stats,
     photos,
+    photoTotal,
     month,
     setMonth,
     loading,

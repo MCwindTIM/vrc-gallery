@@ -1,3 +1,9 @@
+/** YYYY-MM → 2024年3月 */
+export function formatMonthLabel(ym: string): string {
+  const [year, month] = ym.split("-");
+  return `${year}年${Number(month)}月`;
+}
+
 export function formatDayLabel(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString("zh-TW", {
