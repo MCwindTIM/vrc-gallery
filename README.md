@@ -4,11 +4,19 @@ Full-stack photo gallery for [vrc.mcwind.cloud](https://vrc.mcwind.cloud) — br
 
 ## Features
 
-- **Gallery** — paginated grid with infinite scroll, month filter, and lightbox (keyboard navigation, image rotation)
+- **Gallery** — paginated masonry-style grid with infinite scroll, month filter, and lightbox
+- **Month filter** — year-grouped dropdown; custom styled panel on desktop (`sm+`), native `<select>` on mobile; filter syncs to `?month=YYYY-MM` (shareable URLs, browser back/forward); subtitle shows filtered count (e.g. `12 張照片 · 2024年3月`)
+- **Lightbox** — prev/next scoped to the active month filter (including cross-page neighbors via API); swipe/drag horizontally to change photos; keyboard ← → / Esc / R (rotate); load progress for large images with browser-cache awareness
 - **VRChat metadata** — capture date from XMP `CreateDate` or `VRChat_YYYY-MM-DD_…` filenames; optional annotations (world, author, description, in-game comment) from embedded XMP
 - **Admin panel** (`/admin`, internal network only) — upload (drag-and-drop, up to 10 files), edit metadata, rename, delete
 - **Catalog sync** — CLI scans `photos/`, generates JPEG thumbnails, writes `data/photos.json`; catalog reloads automatically when the file changes on disk
 - **Backward compatible** — `GET /photos.json` serves the legacy flat catalog format
+
+### Gallery URL
+
+- `?month=YYYY-MM` — deep-link or share a month filter (e.g. `/?month=2024-03`)
+- Omit the param to show all photos; invalid values are ignored
+- Browser back/forward restores the previous filter
 
 ## Project structure
 
@@ -198,7 +206,7 @@ location ~ ^/(admin|api/admin) {
 | `GET` | `/api/health` | Health check |
 | `GET` | `/api/photos/stats` | `{ total, months, latestDate, updatedAt }` |
 | `GET` | `/api/photos` | Paginated list — query: `page`, `limit` (max 50), `month` (`YYYY-MM` or `YYYY`), `year`, `q` (name search) |
-| `GET` | `/api/photos/:id` | Single photo with `prev` / `next` neighbors |
+| `GET` | `/api/photos/:id` | Single photo with `prev` / `next` neighbors; pass the same `month` / `year` / `q` filters as the list endpoint so neighbors stay within the active filter |
 | `GET` | `/photos.json` | Legacy catalog (no `id` / `year` fields) |
 | `GET` | `/photos/*` | Static image files |
 
