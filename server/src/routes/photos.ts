@@ -52,16 +52,22 @@ photosRouter.get("/", async (req, res, next) => {
 photosRouter.get("/:id", async (req, res, next) => {
   try {
     const { photos } = await loadCatalog();
-    const photo = photos.find((p) => p.id === req.params.id);
+    const month =
+      typeof req.query.month === "string" ? req.query.month : undefined;
+    const year = req.query.year ? Number(req.query.year) : undefined;
+    const q = typeof req.query.q === "string" ? req.query.q : undefined;
+
+    const filtered = filterPhotos(photos, { month, year, q });
+    const photo = filtered.find((p) => p.id === req.params.id);
     if (!photo) {
       res.status(404).json({ error: "Photo not found" });
       return;
     }
-    const index = photos.findIndex((p) => p.id === photo.id);
+    const index = filtered.findIndex((p) => p.id === photo.id);
     res.json({
       photo,
-      prev: photos[index + 1] ?? null,
-      next: photos[index - 1] ?? null,
+      prev: filtered[index + 1] ?? null,
+      next: filtered[index - 1] ?? null,
     });
   } catch (err) {
     next(err);

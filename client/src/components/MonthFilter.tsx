@@ -22,7 +22,7 @@ export function MonthFilter({ months, active, onChange }: MonthFilterProps) {
   }, [months]);
 
   return (
-    <div className="relative w-full sm:w-52">
+    <div className="relative w-full sm:min-w-[12rem] sm:max-w-[16rem] sm:w-auto">
       <select
         id="month-filter"
         aria-label="依月份篩選"

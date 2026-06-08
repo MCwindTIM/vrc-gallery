@@ -1,4 +1,4 @@
-import type { GalleryStats, PhotosPage } from "../types";
+import type { GalleryStats, PhotoDetail, PhotosPage } from "../types";
 
 const BASE = "/api";
 
@@ -22,8 +22,15 @@ function normalizeGalleryStats(raw: Record<string, unknown>): GalleryStats {
   };
 }
 
-export async function fetchStats(): Promise<GalleryStats> {
-  const res = await fetch(`${BASE}/photos/stats`);
+function appendMonthFilter(search: URLSearchParams, month?: string | null) {
+  if (!month) return;
+  search.set("month", month);
+  const year = month.slice(0, 4);
+  if (/^\d{4}$/.test(year)) search.set("year", year);
+}
+
+export async function fetchStats(signal?: AbortSignal): Promise<GalleryStats> {
+  const res = await fetch(`${BASE}/photos/stats`, { signal });
   if (!res.ok) throw new Error("Failed to load stats");
   const data = await res.json();
   return normalizeGalleryStats(data);
@@ -34,19 +41,29 @@ export async function fetchPhotos(params: {
   limit?: number;
   month?: string | null;
   q?: string;
+  signal?: AbortSignal;
 }): Promise<PhotosPage> {
   const search = new URLSearchParams();
   if (params.page) search.set("page", String(params.page));
   if (params.limit) search.set("limit", String(params.limit));
-  if (params.month) {
-    search.set("month", params.month);
-    // 舊版 server 僅支援 year 篩選
-    const year = params.month.slice(0, 4);
-    if (/^\d{4}$/.test(year)) search.set("year", year);
-  }
+  appendMonthFilter(search, params.month);
   if (params.q) search.set("q", params.q);
 
-  const res = await fetch(`${BASE}/photos?${search}`);
+  const res = await fetch(`${BASE}/photos?${search}`, { signal: params.signal });
   if (!res.ok) throw new Error("Failed to load photos");
+  return res.json();
+}
+
+export async function fetchPhotoDetail(
+  id: string,
+  params?: { month?: string | null; signal?: AbortSignal }
+): Promise<PhotoDetail> {
+  const search = new URLSearchParams();
+  appendMonthFilter(search, params?.month);
+
+  const res = await fetch(`${BASE}/photos/${encodeURIComponent(id)}?${search}`, {
+    signal: params?.signal,
+  });
+  if (!res.ok) throw new Error("Failed to load photo");
   return res.json();
 }

@@ -2,7 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Photo, PhotoAnnotation } from "../types";
 import { formatDateTime } from "../lib/format";
+import { useImageLoadProgress } from "../hooks/useImageLoadProgress";
 import { computeRotatedImageLayout } from "../lib/rotatedImageFit";
+
+const SWIPE_THRESHOLD_PX = 56;
+const SWIPE_AXIS_LOCK_PX = 10;
 
 interface LightboxProps {
   photo: Photo | null;
@@ -22,11 +26,28 @@ export function Lightbox({
   hasNext,
 }: LightboxProps) {
   const [rotation, setRotation] = useState(0);
+  const [dragX, setDragX] = useState(0);
   const stageRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const swipeRef = useRef({
+    pointerId: -1,
+    startX: 0,
+    startY: 0,
+    axis: null as "x" | "y" | null,
+  });
   const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
+  const {
+    src: imageSrc,
+    progress,
+    showPercent,
+    showLoading,
+    ready: imageReady,
+    markDecoded,
+  } = useImageLoadProgress(photo?.url);
 
   useEffect(() => {
     setRotation(0);
+    setDragX(0);
   }, [photo?.id]);
 
   useEffect(() => {
@@ -63,6 +84,11 @@ export function Lightbox({
   }, [photo, rotation, stageSize]);
 
   useEffect(() => {
+    const img = imageRef.current;
+    if (img?.complete && img.naturalWidth > 0) markDecoded();
+  }, [imageSrc, markDecoded]);
+
+  useEffect(() => {
     if (!photo) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -77,6 +103,77 @@ export function Lightbox({
       window.removeEventListener("keydown", onKey);
     };
   }, [photo, onClose, onPrev, onNext, hasPrev, hasNext]);
+
+  const imageTransform = useMemo(() => {
+    const drag =
+      dragX === 0
+        ? ""
+        : dragX > 0 && !hasPrev
+          ? ` translateX(${dragX * 0.25}px)`
+          : dragX < 0 && !hasNext
+            ? ` translateX(${dragX * 0.25}px)`
+            : ` translateX(${dragX}px)`;
+    return `translate(-50%, -50%)${drag} rotate(${rotation}deg)`;
+  }, [dragX, hasPrev, hasNext, rotation]);
+
+  const resetSwipe = () => {
+    swipeRef.current.axis = null;
+    swipeRef.current.pointerId = -1;
+    setDragX(0);
+  };
+
+  const handleSwipePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    swipeRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      axis: null,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handleSwipePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const swipe = swipeRef.current;
+    if (swipe.pointerId !== e.pointerId) return;
+
+    const dx = e.clientX - swipe.startX;
+    const dy = e.clientY - swipe.startY;
+
+    if (!swipe.axis) {
+      if (
+        Math.abs(dx) < SWIPE_AXIS_LOCK_PX &&
+        Math.abs(dy) < SWIPE_AXIS_LOCK_PX
+      ) {
+        return;
+      }
+      swipe.axis = Math.abs(dx) >= Math.abs(dy) ? "x" : "y";
+    }
+
+    if (swipe.axis !== "x") return;
+
+    e.preventDefault();
+    setDragX(dx);
+  };
+
+  const handleSwipePointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
+    const swipe = swipeRef.current;
+    if (swipe.pointerId !== e.pointerId) return;
+
+    if (swipe.axis === "x") {
+      if (swipe.startX - e.clientX > SWIPE_THRESHOLD_PX && hasNext) {
+        onNext();
+      } else if (e.clientX - swipe.startX > SWIPE_THRESHOLD_PX && hasPrev) {
+        onPrev();
+      }
+    }
+
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    resetSwipe();
+  };
 
   return (
     <AnimatePresence>
@@ -100,28 +197,82 @@ export function Lightbox({
             >
               {layout && (
                 <div
-                  className="relative flex items-center justify-center"
+                  className="relative flex touch-none cursor-grab items-center justify-center active:cursor-grabbing"
                   onClick={(e) => e.stopPropagation()}
-                  onPointerDown={(e) => e.stopPropagation()}
+                  onPointerDown={handleSwipePointerDown}
+                  onPointerMove={handleSwipePointerMove}
+                  onPointerUp={handleSwipePointerEnd}
+                  onPointerCancel={handleSwipePointerEnd}
                 >
                   <div
                     className="invisible shrink-0"
                     style={{ width: layout.boxW, height: layout.boxH }}
                     aria-hidden
                   />
-                  <img
-                    src={photo.url}
-                    alt={photo.name}
-                    width={layout.imgW}
-                    height={layout.imgH}
-                    style={{
-                      width: layout.imgW,
-                      height: layout.imgH,
-                      transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
-                    }}
-                    className="absolute left-1/2 top-1/2 max-w-none transition-transform duration-300 ease-out"
-                    draggable={false}
-                  />
+                  {showLoading && (
+                    <div
+                      className="absolute left-1/2 top-1/2 flex flex-col items-center justify-center gap-3"
+                      style={{
+                        width: layout.imgW,
+                        height: layout.imgH,
+                        transform: imageTransform,
+                      }}
+                      aria-live="polite"
+                      aria-busy="true"
+                    >
+                      <img
+                        src={photo.thumb}
+                        alt=""
+                        aria-hidden
+                        className="absolute inset-0 h-full w-full scale-105 object-cover opacity-40 blur-md"
+                        draggable={false}
+                      />
+                      <div className="relative flex w-36 flex-col items-center gap-2.5 rounded-xl bg-black/35 px-4 py-3 backdrop-blur-sm">
+                        {showPercent ? (
+                          <>
+                            <span className="font-ui text-sm font-medium tabular-nums text-neutral-100">
+                              {progress}%
+                            </span>
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/15">
+                              <div
+                                className="h-full rounded-full bg-[var(--color-accent)] transition-[width] duration-150 ease-out"
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <LoadingSpinner />
+                            <span className="font-ui text-xs text-neutral-300">
+                              載入中…
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {imageSrc && (
+                    <img
+                      ref={imageRef}
+                      src={imageSrc}
+                      alt={photo.name}
+                      width={layout.imgW}
+                      height={layout.imgH}
+                      onLoad={markDecoded}
+                      onError={markDecoded}
+                      style={{
+                        width: layout.imgW,
+                        height: layout.imgH,
+                        transform: imageTransform,
+                      }}
+                      className={`absolute left-1/2 top-1/2 max-w-none select-none ${
+                        dragX === 0
+                          ? "transition-[opacity,transform] duration-300 ease-out"
+                          : "transition-opacity duration-300 ease-out"
+                      } ${imageReady ? "opacity-100" : "opacity-0"}`}
+                      draggable={false}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -159,6 +310,31 @@ export function Lightbox({
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+function LoadingSpinner() {
+  return (
+    <svg
+      className="h-8 w-8 animate-spin text-[var(--color-accent)]"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="3"
+      />
+      <path
+        className="opacity-90"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z"
+      />
+    </svg>
   );
 }
 

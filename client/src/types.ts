@@ -31,3 +31,9 @@ export interface PhotosPage {
   limit: number;
   hasMore: boolean;
 }
+
+export interface PhotoDetail {
+  photo: Photo;
+  prev: Photo | null;
+  next: Photo | null;
+}

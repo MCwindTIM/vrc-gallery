@@ -1,16 +1,20 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import type { Photo } from "../types";
-import { formatDayLabel, aspectRatio } from "../lib/format";
+import { formatDayLabel, formatMonthLabel, aspectRatio } from "../lib/format";
 import { useInfiniteScroll } from "../hooks/useInfiniteScroll";
+import { usePhotoNeighbors } from "../hooks/usePhotoNeighbors";
 import { MonthFilter } from "./MonthFilter";
 import { Lightbox } from "./Lightbox";
 import type { GalleryStats } from "../types";
 
+const THUMB_SIZES =
+  "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw";
+
 interface GalleryProps {
   stats: GalleryStats | null;
   photos: Photo[];
-  photoTotal: number;
+  displayTotal: number;
   month: string | null;
   setMonth: (m: string | null) => void;
   loading: boolean;
@@ -23,7 +27,7 @@ interface GalleryProps {
 export function Gallery({
   stats,
   photos,
-  photoTotal,
+  displayTotal,
   month,
   setMonth,
   loading,
@@ -33,6 +37,31 @@ export function Gallery({
   onLoadMore,
 }: GalleryProps) {
   const [active, setActive] = useState<Photo | null>(null);
+  const [animateGrid, setAnimateGrid] = useState(true);
+  const scopedActive = useMemo(() => {
+    if (!active) return null;
+    if (month && active.date.slice(0, 7) !== month) return null;
+    return active;
+  }, [active, month]);
+
+  const { prev, next } = usePhotoNeighbors(
+    scopedActive?.id,
+    month,
+    photos,
+    hasMore
+  );
+
+  useEffect(() => {
+    setActive(null);
+    setAnimateGrid(true);
+  }, [month]);
+
+  useEffect(() => {
+    if (!loading && animateGrid) {
+      const t = window.setTimeout(() => setAnimateGrid(false), 600);
+      return () => window.clearTimeout(t);
+    }
+  }, [loading, animateGrid]);
 
   const groups = useMemo(() => {
     const map = new Map<string, Photo[]>();
@@ -45,7 +74,11 @@ export function Gallery({
     return [...map.entries()];
   }, [photos]);
 
-  const activeIndex = active ? photos.findIndex((p) => p.id === active.id) : -1;
+  const subtitle = useMemo(() => {
+    if (loading && !stats) return "載入中…";
+    const base = `${displayTotal} 張照片`;
+    return month ? `${base} · ${formatMonthLabel(month)}` : base;
+  }, [loading, stats, displayTotal, month]);
 
   const scrollSentinelRef = useInfiniteScroll(onLoadMore, {
     enabled: hasMore && !loading && !loadingMore,
@@ -59,9 +92,7 @@ export function Gallery({
             <h2 className="text-3xl font-bold md:text-4xl">
               回憶收藏館
             </h2>
-            <p className="mt-2 text-[var(--color-muted)]">
-              {loading ? "載入中…" : `${photoTotal} 張照片`}
-            </p>
+            <p className="mt-2 text-[var(--color-muted)]">{subtitle}</p>
           </div>
           {stats && (
             <MonthFilter
@@ -87,6 +118,12 @@ export function Gallery({
               />
             ))}
           </div>
+        ) : photos.length === 0 ? (
+          <p className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-panel)]/60 px-6 py-12 text-center text-[var(--color-muted)]">
+            {month
+              ? `${formatMonthLabel(month)} 沒有照片`
+              : "尚無照片"}
+          </p>
         ) : (
           <div className="space-y-12">
             {groups.map(([day, items]) => (
@@ -99,9 +136,15 @@ export function Gallery({
                     <motion.button
                       key={photo.id}
                       type="button"
-                      initial={{ opacity: 0, y: 12 }}
+                      initial={
+                        animateGrid ? { opacity: 0, y: 12 } : false
+                      }
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.04 }}
+                      transition={
+                        animateGrid
+                          ? { delay: Math.min(i * 0.04, 0.4) }
+                          : { duration: 0 }
+                      }
                       onClick={() => setActive(photo)}
                       className="group mb-4 block w-full break-inside-avoid overflow-hidden text-left transition"
                     >
@@ -110,10 +153,16 @@ export function Gallery({
                           src={photo.thumb}
                           alt={photo.name}
                           loading="lazy"
+                          decoding="async"
+                          sizes={THUMB_SIZES}
                           width={photo.width}
                           height={photo.height}
                           className="w-full object-cover transition duration-500 group-hover:scale-[1.02]"
-                          style={{ aspectRatio: String(aspectRatio(photo.width, photo.height)) }}
+                          style={{
+                            aspectRatio: String(
+                              aspectRatio(photo.width, photo.height)
+                            ),
+                          }}
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-void)]/90 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
                         <p className="font-ui absolute bottom-0 left-0 right-0 translate-y-2 p-3 text-sm font-medium opacity-0 transition group-hover:translate-y-0 group-hover:opacity-100">
@@ -128,7 +177,7 @@ export function Gallery({
           </div>
         )}
 
-        {!loading && (
+        {!loading && photos.length > 0 && (
           <div
             ref={scrollSentinelRef}
             className="mt-12 flex min-h-16 items-center justify-center"
@@ -137,7 +186,7 @@ export function Gallery({
             {loadingMore && (
               <p className="text-sm text-[var(--color-muted)]">載入中…</p>
             )}
-            {!hasMore && photos.length > 0 && (
+            {!hasMore && (
               <p className="text-sm text-[var(--color-muted)]">已顯示全部照片</p>
             )}
           </div>
@@ -145,12 +194,12 @@ export function Gallery({
       </div>
 
       <Lightbox
-        photo={active}
+        photo={scopedActive}
         onClose={() => setActive(null)}
-        onPrev={() => activeIndex >= 0 && setActive(photos[activeIndex + 1] ?? null)}
-        onNext={() => activeIndex > 0 && setActive(photos[activeIndex - 1] ?? null)}
-        hasPrev={activeIndex >= 0 && activeIndex < photos.length - 1}
-        hasNext={activeIndex > 0}
+        onPrev={() => prev && setActive(prev)}
+        onNext={() => next && setActive(next)}
+        hasPrev={!!prev}
+        hasNext={!!next}
       />
     </section>
   );

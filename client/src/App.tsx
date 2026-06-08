@@ -17,7 +17,7 @@ export default function App() {
         <Gallery
           stats={gallery.stats}
           photos={gallery.photos}
-          photoTotal={gallery.photoTotal}
+          displayTotal={gallery.displayTotal}
           month={gallery.month}
           setMonth={gallery.setMonth}
           loading={gallery.loading}

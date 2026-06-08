@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { formatMonthLabel } from "../lib/format";
 import type { GalleryStats } from "../types";
 
 interface HeroProps {
@@ -60,7 +61,12 @@ export function Hero({ stats, onExplore }: HeroProps) {
           >
             <StatCard label="照片" value={String(stats.total)} />
             {(stats.months ?? []).slice(0, 2).map((m) => (
-              <StatCard key={m.month} label={m.month} value={String(m.count)} sub="張" />
+              <StatCard
+                key={m.month}
+                label={formatMonthLabel(m.month)}
+                value={String(m.count)}
+                sub="張"
+              />
             ))}
           </motion.div>
         )}
