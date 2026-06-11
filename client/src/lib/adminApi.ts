@@ -32,11 +32,13 @@ const baseInit: RequestInit = {
 
 async function adminFetch(path: string, init?: RequestInit) {
   const res = await fetch(`${BASE}${path}`, { ...baseInit, ...init });
+  if (res.status >= 300 && res.status < 400) {
+    window.location.replace("/");
+    throw new AdminAccessError();
+  }
   if (res.status === 403) {
-    const data = await res.json().catch(() => ({}));
-    throw new AdminAccessError(
-      typeof data.error === "string" ? data.error : "僅限內網 IP 存取"
-    );
+    window.location.replace("/");
+    throw new AdminAccessError();
   }
   if (res.status === 401) {
     throw new AdminAuthError();
@@ -50,13 +52,13 @@ async function adminFetch(path: string, init?: RequestInit) {
 
 export async function checkAdminAccess(): Promise<AdminAccessStatus> {
   const res = await fetch(`${BASE}/access`, baseInit);
+  if (res.status >= 300 && res.status < 400) {
+    window.location.replace("/");
+    throw new AdminAccessError();
+  }
   if (res.status === 403) {
-    const data = await res.json().catch(() => ({}));
-    throw new AdminAccessError(
-      typeof data.error === "string"
-        ? `${data.error}${data.clientIp ? ` (${data.clientIp})` : ""}`
-        : "僅限內網 IP 存取"
-    );
+    window.location.replace("/");
+    throw new AdminAccessError();
   }
   if (!res.ok) {
     throw new Error(`Admin access check failed (${res.status})`);

@@ -1,5 +1,4 @@
 import type { Request, Response, NextFunction } from "express";
-import { isAdminAuthEnabled } from "../lib/adminAuth.js";
 
 function normalizeIp(raw: string): string {
   let ip = raw.trim();
@@ -67,6 +66,15 @@ export function isPrivateIp(ip: string): boolean {
 }
 
 function denyPrivateNetworkAccess(req: Request, res: Response): void {
+  const prefersHtml =
+    req.accepts(["html", "json"]) === "html" ||
+    req.originalUrl.startsWith("/admin");
+
+  if (prefersHtml) {
+    res.redirect(302, "/");
+    return;
+  }
+
   res.status(403).json({
     error: "Private network only",
     clientIp: parseClientIp(req),
@@ -77,23 +85,11 @@ export function isPrivateNetworkRequest(req: Request): boolean {
   return isPrivateIp(parseClientIp(req));
 }
 
-/** Skip IP check when admin password auth is enabled (Docker-friendly default). */
-export function shouldRequirePrivateNetwork(): boolean {
-  if (process.env.ADMIN_REQUIRE_PRIVATE_IP === "1") return true;
-  if (isAdminAuthEnabled()) return false;
-  return true;
-}
-
 export function requirePrivateNetwork(
   req: Request,
   res: Response,
   next: NextFunction
 ): void {
-  if (!shouldRequirePrivateNetwork()) {
-    next();
-    return;
-  }
-
   if (!isPrivateNetworkRequest(req)) {
     denyPrivateNetworkAccess(req, res);
     return;

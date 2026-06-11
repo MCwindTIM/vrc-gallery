@@ -176,7 +176,6 @@ pm2 restart vrc-gallery     # or ./scripts/prod.sh
 | `ADMIN_PASSWORD` | unset | Admin password; when set, `/api/admin/*` mutations require login cookie in addition to private IP |
 | `ADMIN_JWT_SECRET` | derived from password | HMAC secret for admin session cookie (set a dedicated random value in production) |
 | `ADMIN_SESSION_HOURS` | `24` | Admin session lifetime |
-| `ADMIN_REQUIRE_PRIVATE_IP` | unset | Set to `1` to require private IP **in addition to** password; when unset and `ADMIN_PASSWORD` is set, password auth alone protects admin (works better with Docker) |
 | `ADMIN_COOKIE_SECURE` | `1` in production | Set `Secure` flag on admin cookie (auto-enabled when `NODE_ENV=production`) |
 
 When `TRUST_PROXY` is unset, forwarded headers are still trusted if the direct connection comes from a private IP (typical reverse-proxy setup).
@@ -216,7 +215,7 @@ Sync and catalog load **skip** non-image files and directories in `photos/` (e.g
 
 - **UI:** `/admin` (lazy-loaded; non-private clients are redirected to `/`)
 - **API:** `/api/admin/*` (same IP restriction; returns `302` redirect to `/` for public IPs)
-- **Dual protection (optional):** set `ADMIN_PASSWORD` for signed HttpOnly session cookie. Set `ADMIN_REQUIRE_PRIVATE_IP=1` to also require private-network IP (may fail behind Docker port mapping unless proxy headers are correct).
+- **Dual protection:** private-network IP check **plus** `ADMIN_PASSWORD` session cookie. External visitors are redirected away from `/admin`; internal clients see the login form.
 
 | Method | Path | Description |
 |--------|------|-------------|

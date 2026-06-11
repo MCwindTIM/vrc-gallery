@@ -21,6 +21,8 @@ import {
 
 export const adminRouter = Router();
 
+adminRouter.use(requirePrivateNetwork);
+
 adminRouter.get("/access", (req, res) => {
   res.json({
     ...adminAccessStatus(req),
@@ -50,8 +52,6 @@ adminRouter.post("/logout", (_req, res) => {
   clearAdminCookie(res);
   res.json({ ok: true });
 });
-
-adminRouter.use(requirePrivateNetwork);
 
 const upload = multer({
   storage: multer.diskStorage({

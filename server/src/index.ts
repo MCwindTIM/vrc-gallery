@@ -53,7 +53,7 @@ if (fs.existsSync(PHOTOS_DIR)) {
 const clientIndex = path.join(CLIENT_DIST, "index.html");
 if (fs.existsSync(clientIndex)) {
   app.use(express.static(CLIENT_DIST, { maxAge: "1h" }));
-  app.get(/^\/admin(?:\/.*)?$/, (_req, res) => {
+  app.get(/^\/admin(?:\/.*)?$/, requirePrivateNetwork, (_req, res) => {
     res.sendFile(clientIndex);
   });
   app.get(/^(?!\/api|\/photos).*/, (_req, res) => {

@@ -89,8 +89,6 @@ export default function Admin() {
       setPhotos(data.photos);
     } catch (err) {
       if (err instanceof AdminAccessError) {
-        setAccess(null);
-        setError(err.message);
         return;
       }
       if (err instanceof AdminAuthError) {
@@ -260,7 +258,9 @@ export default function Admin() {
           className="w-full max-w-sm rounded-2xl border border-border bg-panel/90 p-6 shadow-lg font-ui"
         >
           <h1 className="text-xl font-semibold text-text">相簿管理登入</h1>
-          <p className="mt-1 text-sm text-muted">請輸入管理員密碼以繼續。</p>
+          <p className="mt-1 text-sm text-muted">
+            內網存取已通過，請輸入管理員密碼。
+          </p>
           {error && (
             <p className="mt-4 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
