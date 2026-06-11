@@ -3,6 +3,16 @@ import path from "node:path";
 import sharp from "sharp";
 
 export const THUMB_MAX = 640;
+export const THUMB_EXT = "webp";
+export const THUMB_QUALITY = 82;
+
+export function thumbFilename(id: string): string {
+  return `${id}_thumb.${THUMB_EXT}`;
+}
+
+export function thumbUrl(id: string): string {
+  return `/photos/thumbs/${thumbFilename(id)}`;
+}
 
 export async function ensureThumb(
   srcPath: string,
@@ -15,8 +25,9 @@ export async function ensureThumb(
   } catch {
     /* generate */
   }
+
   await sharp(srcPath)
     .resize(THUMB_MAX, THUMB_MAX, { fit: "inside", withoutEnlargement: true })
-    .jpeg({ quality: 82 })
+    .webp({ quality: THUMB_QUALITY })
     .toFile(thumbPath);
 }

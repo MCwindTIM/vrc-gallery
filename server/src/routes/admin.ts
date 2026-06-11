@@ -3,7 +3,15 @@ import path from "node:path";
 import { Router } from "express";
 import multer from "multer";
 import { PHOTOS_DIR } from "../lib/paths.js";
-import { requirePrivateNetwork } from "../middleware/privateNetwork.js";
+import {
+  adminAccessStatus,
+  clearAdminCookie,
+  createAdminToken,
+  setAdminCookie,
+  verifyAdminPassword,
+} from "../lib/adminAuth.js";
+import { requireAdminAuth } from "../middleware/adminAuth.js";
+import { requirePrivateNetwork, parseClientIp, isPrivateNetworkRequest } from "../middleware/privateNetwork.js";
 import { loadCatalog } from "../services/photoCatalog.js";
 import {
   deletePhoto,
@@ -12,6 +20,36 @@ import {
 } from "../services/photoAdmin.js";
 
 export const adminRouter = Router();
+
+adminRouter.get("/access", (req, res) => {
+  res.json({
+    ...adminAccessStatus(req),
+    privateNetwork: isPrivateNetworkRequest(req),
+    clientIp: parseClientIp(req),
+  });
+});
+
+adminRouter.post("/login", (req, res) => {
+  const password = typeof req.body?.password === "string" ? req.body.password : "";
+  if (!verifyAdminPassword(password)) {
+    res.status(401).json({ error: "Invalid password" });
+    return;
+  }
+
+  const token = createAdminToken();
+  setAdminCookie(res, token);
+  res.json({
+    ok: true,
+    admin: true,
+    authRequired: true,
+    authenticated: true,
+  });
+});
+
+adminRouter.post("/logout", (_req, res) => {
+  clearAdminCookie(res);
+  res.json({ ok: true });
+});
 
 adminRouter.use(requirePrivateNetwork);
 
@@ -29,9 +67,7 @@ const upload = multer({
   },
 });
 
-adminRouter.get("/access", (_req, res) => {
-  res.json({ ok: true, admin: true });
-});
+adminRouter.use(requireAdminAuth);
 
 adminRouter.get("/photos", async (_req, res, next) => {
   try {

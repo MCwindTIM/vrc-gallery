@@ -5,7 +5,7 @@ import { resolvePhotoCreateDate } from "../lib/photoDate.js";
 import { parsePhotoAnnotation } from "../lib/photoMetadata.js";
 import { isPhotoFilename } from "../lib/imageFile.js";
 import { PHOTOS_DIR } from "../lib/paths.js";
-import { ensureThumb } from "../lib/thumbnail.js";
+import { ensureThumb, thumbFilename, thumbUrl } from "../lib/thumbnail.js";
 import type { PhotoAnnotation, PhotoRecord } from "../lib/types.js";
 import { loadCatalog, saveCatalog } from "./photoCatalog.js";
 
@@ -37,7 +37,7 @@ async function buildRecordFromFile(filename: string): Promise<PhotoRecord> {
   const safe = safeBasename(filename);
   const srcPath = path.join(PHOTOS_DIR, safe);
   const id = idFromFilename(safe);
-  const thumbName = `${id}_thumb.jpg`;
+  const thumbName = thumbFilename(id);
   const thumbFs = path.join(PHOTOS_DIR, "thumbs", thumbName);
 
   await ensureThumb(srcPath, thumbFs);
@@ -55,7 +55,7 @@ async function buildRecordFromFile(filename: string): Promise<PhotoRecord> {
     id,
     name: path.parse(safe).name,
     url: `/photos/${safe}`,
-    thumb: `/photos/thumbs/${thumbName}`,
+    thumb: thumbUrl(id),
     date: created.toISOString(),
     width: meta.width ?? 0,
     height: meta.height ?? 0,
@@ -110,7 +110,7 @@ export async function updatePhoto(
       const newFilename = `${trimmed}${ext}`;
       const { src, thumb } = photoPaths(current);
       const newSrc = path.join(PHOTOS_DIR, newFilename);
-      const newThumbName = `${trimmed}_thumb.jpg`;
+      const newThumbName = thumbFilename(trimmed);
       const newThumb = path.join(PHOTOS_DIR, "thumbs", newThumbName);
 
       if (catalog.photos.some((p) => p.id === trimmed && p.id !== id)) {
@@ -129,7 +129,7 @@ export async function updatePhoto(
         id: trimmed,
         name: trimmed,
         url: `/photos/${newFilename}`,
-        thumb: `/photos/thumbs/${newThumbName}`,
+        thumb: thumbUrl(trimmed),
       };
     }
   }

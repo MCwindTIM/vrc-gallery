@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import { isAdminAuthEnabled } from "../lib/adminAuth.js";
 
 function normalizeIp(raw: string): string {
   let ip = raw.trim();
@@ -9,29 +10,33 @@ function normalizeIp(raw: string): string {
 
 function headerIp(value: string | string[] | undefined): string | null {
   if (typeof value !== "string" || !value.trim()) return null;
-  return normalizeIp(value.split(",")[0]);
+  return normalizeIp(value.split(",")[0].trim());
 }
 
-function shouldTrustForwardedHeaders(directIp: string): boolean {
-  if (process.env.TRUST_PROXY === "1" || process.env.TRUST_PROXY === "true") {
-    return true;
-  }
-  // Direct connection from a private IP usually means a reverse proxy in front.
-  return isPrivateIp(directIp);
+function socketIp(req: Request): string {
+  return normalizeIp(req.socket.remoteAddress ?? "");
 }
 
-function parseClientIp(req: Request): string {
-  const direct = normalizeIp(req.ip ?? req.socket.remoteAddress ?? "");
+function shouldTrustForwardedHeaders(socket: string): boolean {
+  const explicit =
+    process.env.TRUST_PROXY === "1" || process.env.TRUST_PROXY === "true";
+  if (explicit) return true;
+  return isPrivateIp(socket);
+}
 
-  if (shouldTrustForwardedHeaders(direct)) {
-    const forwarded = headerIp(req.headers["x-forwarded-for"]);
+export function parseClientIp(req: Request): string {
+  const socket = socketIp(req);
+  const forwarded = headerIp(req.headers["x-forwarded-for"]);
+  const realIp = headerIp(req.headers["x-real-ip"]);
+  const hasProxyHeaders = Boolean(forwarded || realIp);
+
+  if (hasProxyHeaders && shouldTrustForwardedHeaders(socket)) {
     if (forwarded) return forwarded;
-
-    const realIp = headerIp(req.headers["x-real-ip"]);
     if (realIp) return realIp;
   }
 
-  return direct;
+  if (socket) return socket;
+  return normalizeIp(req.ip ?? "");
 }
 
 function isPrivateIpv4(ip: string): boolean {
@@ -61,12 +66,22 @@ export function isPrivateIp(ip: string): boolean {
   return isPrivateIpv4(ip);
 }
 
-function denyPrivateNetworkAccess(_req: Request, res: Response): void {
-  res.redirect(302, "/");
+function denyPrivateNetworkAccess(req: Request, res: Response): void {
+  res.status(403).json({
+    error: "Private network only",
+    clientIp: parseClientIp(req),
+  });
 }
 
 export function isPrivateNetworkRequest(req: Request): boolean {
   return isPrivateIp(parseClientIp(req));
+}
+
+/** Skip IP check when admin password auth is enabled (Docker-friendly default). */
+export function shouldRequirePrivateNetwork(): boolean {
+  if (process.env.ADMIN_REQUIRE_PRIVATE_IP === "1") return true;
+  if (isAdminAuthEnabled()) return false;
+  return true;
 }
 
 export function requirePrivateNetwork(
@@ -74,6 +89,11 @@ export function requirePrivateNetwork(
   res: Response,
   next: NextFunction
 ): void {
+  if (!shouldRequirePrivateNetwork()) {
+    next();
+    return;
+  }
+
   if (!isPrivateNetworkRequest(req)) {
     denyPrivateNetworkAccess(req, res);
     return;

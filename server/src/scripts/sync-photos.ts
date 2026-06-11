@@ -5,7 +5,7 @@ import { resolvePhotoCreateDate } from "../lib/photoDate.js";
 import { isPhotoFilename } from "../lib/imageFile.js";
 import { parsePhotoAnnotation } from "../lib/photoMetadata.js";
 import { PHOTOS_DIR, CATALOG_PATH } from "../lib/paths.js";
-import { ensureThumb } from "../lib/thumbnail.js";
+import { ensureThumb, thumbFilename, thumbUrl } from "../lib/thumbnail.js";
 import type { PhotoRecord } from "../lib/types.js";
 import { saveCatalog } from "../services/photoCatalog.js";
 
@@ -38,7 +38,7 @@ async function scan(): Promise<PhotoRecord[]> {
 
     try {
       const id = idFromFilename(entry);
-      const thumbName = `${id}_thumb.jpg`;
+      const thumbName = thumbFilename(id);
       const thumbFs = path.join(PHOTOS_DIR, "thumbs", thumbName);
       await ensureThumb(srcPath, thumbFs);
 
@@ -56,7 +56,7 @@ async function scan(): Promise<PhotoRecord[]> {
         id,
         name: path.parse(entry).name,
         url: `/photos/${entry}`,
-        thumb: `/photos/thumbs/${thumbName}`,
+        thumb: thumbUrl(id),
         date: created.toISOString(),
         width: meta.width ?? 0,
         height: meta.height ?? 0,

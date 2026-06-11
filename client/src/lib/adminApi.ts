@@ -2,6 +2,15 @@ import type { Photo, PhotoAnnotation } from "../types";
 
 const BASE = "/api/admin";
 
+export interface AdminAccessStatus {
+  ok: boolean;
+  admin: boolean;
+  authRequired: boolean;
+  authenticated: boolean;
+  privateNetwork?: boolean;
+  clientIp?: string;
+}
+
 export class AdminAccessError extends Error {
   constructor(message = "僅限內網 IP 存取") {
     super(message);
@@ -9,31 +18,68 @@ export class AdminAccessError extends Error {
   }
 }
 
-function isRedirect(status: number): boolean {
-  return status >= 300 && status < 400;
+export class AdminAuthError extends Error {
+  constructor(message = "請先登入管理後台") {
+    super(message);
+    this.name = "AdminAuthError";
+  }
 }
 
+const baseInit: RequestInit = {
+  credentials: "include",
+  redirect: "manual",
+};
+
 async function adminFetch(path: string, init?: RequestInit) {
-  const res = await fetch(`${BASE}${path}`, { ...init, redirect: "manual" });
-  if (isRedirect(res.status)) {
-    window.location.replace("/");
-    throw new AdminAccessError();
+  const res = await fetch(`${BASE}${path}`, { ...baseInit, ...init });
+  if (res.status === 403) {
+    const data = await res.json().catch(() => ({}));
+    throw new AdminAccessError(
+      typeof data.error === "string" ? data.error : "僅限內網 IP 存取"
+    );
+  }
+  if (res.status === 401) {
+    throw new AdminAuthError();
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(typeof data.error === "string" ? data.error : "Request failed");
   }
   return res;
 }
 
-export async function checkAdminAccess(): Promise<boolean> {
-  try {
-    const res = await fetch(`${BASE}/access`, { redirect: "manual" });
-    if (isRedirect(res.status)) {
-      window.location.replace("/");
-      return false;
-    }
-    return res.ok;
-  } catch (err) {
-    if (err instanceof AdminAccessError) return false;
-    throw err;
+export async function checkAdminAccess(): Promise<AdminAccessStatus> {
+  const res = await fetch(`${BASE}/access`, baseInit);
+  if (res.status === 403) {
+    const data = await res.json().catch(() => ({}));
+    throw new AdminAccessError(
+      typeof data.error === "string"
+        ? `${data.error}${data.clientIp ? ` (${data.clientIp})` : ""}`
+        : "僅限內網 IP 存取"
+    );
   }
+  if (!res.ok) {
+    throw new Error(`Admin access check failed (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function loginAdmin(password: string): Promise<AdminAccessStatus> {
+  const res = await fetch(`${BASE}/login`, {
+    ...baseInit,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error === "Invalid password" ? "密碼錯誤" : "登入失敗");
+  }
+  return data;
+}
+
+export async function logoutAdmin(): Promise<void> {
+  await fetch(`${BASE}/logout`, { ...baseInit, method: "POST" });
 }
 
 export async function fetchAdminPhotos(): Promise<{
@@ -42,7 +88,6 @@ export async function fetchAdminPhotos(): Promise<{
   updatedAt: string;
 }> {
   const res = await adminFetch("/photos");
-  if (!res.ok) throw new Error("Failed to load photos");
   return res.json();
 }
 
@@ -58,8 +103,8 @@ export async function uploadPhotos(
   }
   const res = await adminFetch("/photos", { method: "POST", body: form });
   const data = await res.json();
-  if (!res.ok && !data.created?.length) {
-    throw new Error(data.error ?? "Upload failed");
+  if (!data.created?.length && data.errors?.length) {
+    throw new Error(data.errors[0]?.message ?? "Upload failed");
   }
   return data;
 }
@@ -78,16 +123,11 @@ export async function updatePhoto(
     body: JSON.stringify(payload),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Update failed");
   return data.photo;
 }
 
 export async function deletePhoto(id: string): Promise<void> {
-  const res = await adminFetch(`/photos/${encodeURIComponent(id)}`, {
+  await adminFetch(`/photos/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error ?? "Delete failed");
-  }
 }

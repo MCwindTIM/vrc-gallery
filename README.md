@@ -8,7 +8,7 @@ Full-stack photo gallery for [vrc.mcwind.cloud](https://vrc.mcwind.cloud) — br
 - **Month filter** — year-grouped dropdown; custom styled panel on desktop (`sm+`), native `<select>` on mobile; filter syncs to `?month=YYYY-MM` (shareable URLs, browser back/forward); subtitle shows filtered count (e.g. `12 張照片 · 2024年3月`)
 - **Lightbox** — prev/next scoped to the active month filter (including cross-page neighbors via API); swipe/drag horizontally to change photos; keyboard ← → / Esc / R (rotate); load progress for large images with browser-cache awareness
 - **VRChat metadata** — capture date from XMP `CreateDate` or `VRChat_YYYY-MM-DD_…` filenames; optional annotations (world, author, description, in-game comment) from embedded XMP
-- **Admin panel** (`/admin`, internal network only) — upload (drag-and-drop, up to 10 files), edit metadata, rename, delete
+- **Admin panel** (`/admin`, internal network only) — upload (drag-and-drop, up to 10 files), edit metadata, rename, delete; optional password login with signed HttpOnly session cookie (see `ADMIN_PASSWORD`)
 - **Catalog sync** — CLI scans `photos/`, generates JPEG thumbnails, writes `data/photos.json`; non-image files (e.g. `photos.json`, `thumbs/`) are skipped automatically; catalog reloads when the file changes on disk
 - **Backward compatible** — `GET /photos.json` serves the legacy flat catalog format
 
@@ -141,7 +141,7 @@ Expected layout:
 photos/
   image.png
   thumbs/
-    image_thumb.jpg
+    image_thumb.webp
 data/
   photos.json
 ```
@@ -173,6 +173,11 @@ pm2 restart vrc-gallery     # or ./scripts/prod.sh
 | `PHOTO_TZ` | `Asia/Taipei` | IANA timezone for gallery day/month grouping, month filter, and stats (server) |
 | `CORS_ORIGIN` | reflect request origin | Allowed CORS origin (set explicitly in production) |
 | `TRUST_PROXY` | unset | Set to `1` behind a reverse proxy so admin IP checks use `X-Forwarded-For` / `X-Real-IP` |
+| `ADMIN_PASSWORD` | unset | Admin password; when set, `/api/admin/*` mutations require login cookie in addition to private IP |
+| `ADMIN_JWT_SECRET` | derived from password | HMAC secret for admin session cookie (set a dedicated random value in production) |
+| `ADMIN_SESSION_HOURS` | `24` | Admin session lifetime |
+| `ADMIN_REQUIRE_PRIVATE_IP` | unset | Set to `1` to require private IP **in addition to** password; when unset and `ADMIN_PASSWORD` is set, password auth alone protects admin (works better with Docker) |
+| `ADMIN_COOKIE_SECURE` | `1` in production | Set `Secure` flag on admin cookie (auto-enabled when `NODE_ENV=production`) |
 
 When `TRUST_PROXY` is unset, forwarded headers are still trusted if the direct connection comes from a private IP (typical reverse-proxy setup).
 
@@ -188,7 +193,7 @@ When `TRUST_PROXY` is unset, forwarded headers are still trusted if the direct c
 1. Drop full-size images into `photos/` (supported: `.jpg`, `.jpeg`, `.png`, `.webp`)
 2. Run `npm run sync-photos`
 
-This writes `photos/thumbs/{id}_thumb.jpg` (max 640px, JPEG quality 82) and updates `data/photos.json`.
+This writes `photos/thumbs/{id}_thumb.webp` (max 640px, WebP quality 82) and updates `data/photos.json`. Re-run sync after upgrading to regenerate WebP thumbnails and refresh catalog paths.
 
 Sync and catalog load **skip** non-image files and directories in `photos/` (e.g. stray `photos.json`, `thumbs/`, other extensions) without failing. Unreadable image files are logged and skipped during sync. Admin upload silently ignores non-image files in a batch.
 
@@ -211,6 +216,15 @@ Sync and catalog load **skip** non-image files and directories in `photos/` (e.g
 
 - **UI:** `/admin` (lazy-loaded; non-private clients are redirected to `/`)
 - **API:** `/api/admin/*` (same IP restriction; returns `302` redirect to `/` for public IPs)
+- **Dual protection (optional):** set `ADMIN_PASSWORD` for signed HttpOnly session cookie. Set `ADMIN_REQUIRE_PRIVATE_IP=1` to also require private-network IP (may fail behind Docker port mapping unless proxy headers are correct).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/access` | `{ ok, admin, authRequired, authenticated }` — IP check only |
+| `POST` | `/api/admin/login` | `{ password }` → sets HttpOnly `vrc_admin` cookie |
+| `POST` | `/api/admin/logout` | Clears admin cookie |
+
+All routes below also require a valid admin session cookie when `ADMIN_PASSWORD` is set:
 
 From a private-network IP (RFC 1918, loopback, link-local):
 

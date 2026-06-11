@@ -8,11 +8,12 @@ import { adminRouter } from "./routes/admin.js";
 import { requirePrivateNetwork } from "./middleware/privateNetwork.js";
 import { loadCatalog } from "./services/photoCatalog.js";
 import { CLIENT_DIST, PHOTOS_DIR, CATALOG_PATH } from "./lib/paths.js";
+import { warnIfAdminAuthMisconfigured } from "./lib/adminAuth.js";
 
 const PORT = Number(process.env.PORT) || 8787;
 const app = express();
 
-if (process.env.TRUST_PROXY) {
+if (process.env.TRUST_PROXY === "1" || process.env.TRUST_PROXY === "true") {
   app.set("trust proxy", true);
 }
 
@@ -52,7 +53,7 @@ if (fs.existsSync(PHOTOS_DIR)) {
 const clientIndex = path.join(CLIENT_DIST, "index.html");
 if (fs.existsSync(clientIndex)) {
   app.use(express.static(CLIENT_DIST, { maxAge: "1h" }));
-  app.get(/^\/admin(?:\/.*)?$/, requirePrivateNetwork, (_req, res) => {
+  app.get(/^\/admin(?:\/.*)?$/, (_req, res) => {
     res.sendFile(clientIndex);
   });
   app.get(/^(?!\/api|\/photos).*/, (_req, res) => {
@@ -77,6 +78,7 @@ app.use(
 );
 
 app.listen(PORT, () => {
+  warnIfAdminAuthMisconfigured();
   console.log(`vrc-gallery server http://localhost:${PORT}`);
   console.log(`  catalog: ${CATALOG_PATH}`);
   console.log(`  photos:  ${fs.existsSync(PHOTOS_DIR) ? PHOTOS_DIR : "(not mounted)"}`);

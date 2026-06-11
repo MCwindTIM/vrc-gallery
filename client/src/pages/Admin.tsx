@@ -1,12 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import type { Photo, PhotoAnnotation } from "../types";
 import {
   AdminAccessError,
+  AdminAuthError,
   checkAdminAccess,
   deletePhoto,
   fetchAdminPhotos,
+  loginAdmin,
+  logoutAdmin,
   updatePhoto,
   uploadPhotos,
+  type AdminAccessStatus,
 } from "../lib/adminApi";
 import { formatDateTime } from "../lib/format";
 
@@ -56,7 +60,9 @@ function formToPayload(form: EditForm) {
 }
 
 export default function Admin() {
-  const [allowed, setAllowed] = useState<boolean | null>(null);
+  const [access, setAccess] = useState<AdminAccessStatus | null>(null);
+  const [password, setPassword] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -73,12 +79,34 @@ export default function Admin() {
     setLoading(true);
     setError(null);
     try {
-      const ok = await checkAdminAccess();
-      setAllowed(ok);
-      if (!ok) return;
+      const status = await checkAdminAccess();
+      setAccess(status);
+      if (status.authRequired && !status.authenticated) {
+        setPhotos([]);
+        return;
+      }
       const data = await fetchAdminPhotos();
       setPhotos(data.photos);
     } catch (err) {
+      if (err instanceof AdminAccessError) {
+        setAccess(null);
+        setError(err.message);
+        return;
+      }
+      if (err instanceof AdminAuthError) {
+        setAccess((prev) =>
+          prev
+            ? { ...prev, authenticated: false }
+            : {
+                ok: true,
+                admin: true,
+                authRequired: true,
+                authenticated: false,
+              }
+        );
+        setPhotos([]);
+        return;
+      }
       setError(err instanceof Error ? err.message : "載入失敗");
     } finally {
       setLoading(false);
@@ -92,6 +120,36 @@ export default function Admin() {
   const flash = (text: string) => {
     setMessage(text);
     setTimeout(() => setMessage(null), 4000);
+  };
+
+  const handleLogin = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!password.trim()) return;
+
+    setLoggingIn(true);
+    setError(null);
+    try {
+      const status = await loginAdmin(password);
+      setAccess(status);
+      setPassword("");
+      const data = await fetchAdminPhotos();
+      setPhotos(data.photos);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "登入失敗");
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await logoutAdmin();
+    setPhotos([]);
+    setAccess({
+      ok: true,
+      admin: true,
+      authRequired: true,
+      authenticated: false,
+    });
   };
 
   const handleUpload = async (files: FileList | File[]) => {
@@ -111,7 +169,11 @@ export default function Admin() {
       }
     } catch (err) {
       if (err instanceof AdminAccessError) {
-        setAllowed(false);
+        setAccess(null);
+      } else if (err instanceof AdminAuthError) {
+        setAccess((prev) =>
+          prev ? { ...prev, authenticated: false } : prev
+        );
       } else {
         setError(err instanceof Error ? err.message : "上傳失敗");
       }
@@ -165,9 +227,68 @@ export default function Admin() {
     }
   };
 
-  if (allowed === false) {
-    window.location.replace("/");
-    return null;
+  if (loading && !access) {
+    return (
+      <div className="mesh-bg min-h-dvh flex items-center justify-center text-muted font-ui">
+        載入中…
+      </div>
+    );
+  }
+
+  if (access === null && error) {
+    return (
+      <div className="mesh-bg min-h-dvh flex items-center justify-center px-4">
+        <div className="w-full max-w-sm rounded-2xl border border-red-300 bg-panel/90 p-6 font-ui text-center">
+          <p className="text-red-700 text-sm whitespace-pre-line">{error}</p>
+          <a href="/" className="mt-4 inline-block text-sm text-accent hover:underline">
+            返回相簿
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  if (!access) return null;
+
+  const needsLogin = access.authRequired && !access.authenticated;
+
+  if (needsLogin) {
+    return (
+      <div className="mesh-bg min-h-dvh flex items-center justify-center px-4">
+        <form
+          onSubmit={handleLogin}
+          className="w-full max-w-sm rounded-2xl border border-border bg-panel/90 p-6 shadow-lg font-ui"
+        >
+          <h1 className="text-xl font-semibold text-text">相簿管理登入</h1>
+          <p className="mt-1 text-sm text-muted">請輸入管理員密碼以繼續。</p>
+          {error && (
+            <p className="mt-4 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
+            </p>
+          )}
+          <label className="mt-4 block text-sm text-text">
+            管理員密碼
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={loggingIn || !password.trim()}
+            className="mt-4 w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:opacity-90 disabled:opacity-50"
+          >
+            {loggingIn ? "登入中…" : "登入"}
+          </button>
+          <a href="/" className="mt-4 block text-center text-sm text-accent hover:underline">
+            返回相簿
+          </a>
+        </form>
+      </div>
+    );
   }
 
   return (
@@ -182,12 +303,23 @@ export default function Admin() {
               {loading ? "載入中…" : `共 ${photos.length} 張`}
             </p>
           </div>
-          <a
-            href="/"
-            className="text-sm font-ui text-accent hover:underline shrink-0"
-          >
-            返回相簿
-          </a>
+          <div className="flex items-center gap-3 shrink-0">
+            {access.authRequired && (
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="text-sm font-ui text-muted hover:text-text"
+              >
+                登出
+              </button>
+            )}
+            <a
+              href="/"
+              className="text-sm font-ui text-accent hover:underline"
+            >
+              返回相簿
+            </a>
+          </div>
         </div>
       </header>
 
