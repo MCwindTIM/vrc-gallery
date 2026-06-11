@@ -4,7 +4,7 @@ Full-stack photo gallery for [vrc.mcwind.cloud](https://vrc.mcwind.cloud) — br
 
 ## Features
 
-- **Gallery** — paginated masonry-style grid with infinite scroll, month filter, and lightbox
+- **Gallery** — paginated masonry-style grid with infinite scroll, month filter, and lightbox; day/month grouping uses `Asia/Taipei` (+08:00), timestamps shown in 24-hour format (e.g. `2026/06/11 00:38`)
 - **Month filter** — year-grouped dropdown; custom styled panel on desktop (`sm+`), native `<select>` on mobile; filter syncs to `?month=YYYY-MM` (shareable URLs, browser back/forward); subtitle shows filtered count (e.g. `12 張照片 · 2024年3月`)
 - **Lightbox** — prev/next scoped to the active month filter (including cross-page neighbors via API); swipe/drag horizontally to change photos; keyboard ← → / Esc / R (rotate); load progress for large images with browser-cache awareness
 - **VRChat metadata** — capture date from XMP `CreateDate` or `VRChat_YYYY-MM-DD_…` filenames; optional annotations (world, author, description, in-game comment) from embedded XMP
@@ -170,6 +170,7 @@ pm2 restart vrc-gallery     # or ./scripts/prod.sh
 | `CATALOG_PATH` | `{DATA_DIR}/photos.json` | Photo catalog file |
 | `PHOTOS_DIR` | `./photos` | Original images; thumbnails go in `photos/thumbs/` |
 | `PHOTO_TZ_OFFSET` | `+08:00` | Timezone offset for VRChat filename dates (no TZ in filename) |
+| `PHOTO_TZ` | `Asia/Taipei` | IANA timezone for gallery day/month grouping, month filter, and stats (server) |
 | `CORS_ORIGIN` | reflect request origin | Allowed CORS origin (set explicitly in production) |
 | `TRUST_PROXY` | unset | Set to `1` behind a reverse proxy so admin IP checks use `X-Forwarded-For` / `X-Real-IP` |
 
@@ -198,6 +199,13 @@ Sync and catalog load **skip** non-image files and directories in `photos/` (e.g
 3. Filesystem birth time
 
 **Annotations** (optional, from XMP at sync/upload time): `WorldDisplayName`, `xmp:Author`, `dc:description` / `dc:title`, `exif:UserComment`. Shown in the lightbox and editable in admin.
+
+**Dates & time display**
+
+- Stored `date` values are ISO UTC strings from XMP / filename / filesystem at sync time
+- Gallery day headers, month filter (`?month=YYYY-MM`), and `/api/photos/stats` month counts use **local calendar dates** in `Asia/Taipei` (override server-side with `PHOTO_TZ`)
+- Lightbox and admin list timestamps use **24-hour** format: `YYYY/MM/DD HH:mm` (no 上午/下午)
+- VRChat filename fallback still uses `PHOTO_TZ_OFFSET` when the filename has no timezone
 
 ## Admin (internal network only)
 

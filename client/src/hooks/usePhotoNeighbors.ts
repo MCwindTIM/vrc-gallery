@@ -1,16 +1,17 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { fetchPhotoDetail } from "../lib/api";
+import { photoLocalMonthKey } from "../lib/format";
 import type { Photo } from "../types";
 
 function withinMonth(photo: Photo | null, month: string | null): Photo | null {
   if (!photo) return null;
   if (!month) return photo;
-  return photo.date.slice(0, 7) === month ? photo : null;
+  return photoLocalMonthKey(photo.date) === month ? photo : null;
 }
 
 function scopePhotos(photos: Photo[], month: string | null): Photo[] {
   if (!month) return photos;
-  return photos.filter((p) => p.date.slice(0, 7) === month);
+  return photos.filter((p) => photoLocalMonthKey(p.date) === month);
 }
 
 /** 從已載入列表取得相鄰照片（新→舊排序） */

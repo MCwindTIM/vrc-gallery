@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import type { Photo } from "../types";
-import { formatDayLabel, formatMonthLabel, aspectRatio } from "../lib/format";
+import {
+  formatDayLabelFromKey,
+  formatMonthLabel,
+  photoLocalDateKey,
+  photoLocalMonthKey,
+  aspectRatio,
+} from "../lib/format";
 import { useInfiniteScroll } from "../hooks/useInfiniteScroll";
 import { usePhotoNeighbors } from "../hooks/usePhotoNeighbors";
 import { MonthFilter } from "./MonthFilter";
@@ -40,7 +46,7 @@ export function Gallery({
   const [animateGrid, setAnimateGrid] = useState(true);
   const scopedActive = useMemo(() => {
     if (!active) return null;
-    if (month && active.date.slice(0, 7) !== month) return null;
+    if (month && photoLocalMonthKey(active.date) !== month) return null;
     return active;
   }, [active, month]);
 
@@ -66,7 +72,7 @@ export function Gallery({
   const groups = useMemo(() => {
     const map = new Map<string, Photo[]>();
     for (const p of photos) {
-      const key = p.date.slice(0, 10);
+      const key = photoLocalDateKey(p.date);
       const list = map.get(key) ?? [];
       list.push(p);
       map.set(key, list);
@@ -129,7 +135,7 @@ export function Gallery({
             {groups.map(([day, items]) => (
               <div key={day}>
                 <h3 className="font-ui mb-4 text-sm font-medium text-[var(--color-accent-2)]">
-                  {formatDayLabel(items[0].date)}
+                  {formatDayLabelFromKey(day)}
                 </h3>
                 <div className="columns-1 gap-4 sm:columns-2 lg:columns-3">
                   {items.map((photo, i) => (

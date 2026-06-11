@@ -1,6 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { isReadablePhotoFile } from "../lib/imageFile.js";
+import {
+  photoLocalDateKey,
+  photoLocalMonthKey,
+  photoLocalYear,
+} from "../lib/photoTz.js";
 import type { PhotoCatalog, PhotoRecord, PhotosQuery } from "../lib/types.js";
 import { CATALOG_PATH, PHOTOS_DIR } from "../lib/paths.js";
 
@@ -58,8 +63,8 @@ export function filterPhotos(
   if (query.month) {
     const m = query.month;
     result = result.filter((p) => {
-      const key = p.date.slice(0, 7);
-      return key === m || (m.length === 4 && p.year === Number(m));
+      const key = photoLocalMonthKey(p.date);
+      return key === m || (m.length === 4 && photoLocalYear(p.date) === Number(m));
     });
   } else if (query.year) {
     result = result.filter((p) => p.year === query.year);
@@ -95,7 +100,7 @@ export function paginate<T>(
 export function groupByDate(photos: PhotoRecord[]): Map<string, PhotoRecord[]> {
   const groups = new Map<string, PhotoRecord[]>();
   for (const photo of photos) {
-    const key = photo.date.slice(0, 10);
+    const key = photoLocalDateKey(photo.date);
     const bucket = groups.get(key) ?? [];
     bucket.push(photo);
     groups.set(key, bucket);
@@ -106,7 +111,7 @@ export function groupByDate(photos: PhotoRecord[]): Map<string, PhotoRecord[]> {
 export function getStats(photos: PhotoRecord[]) {
   const monthCounts = new Map<string, number>();
   for (const p of photos) {
-    const month = p.date.slice(0, 7);
+    const month = photoLocalMonthKey(p.date);
     monthCounts.set(month, (monthCounts.get(month) ?? 0) + 1);
   }
   const months = [...monthCounts.entries()]
