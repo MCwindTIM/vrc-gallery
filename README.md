@@ -172,13 +172,13 @@ pm2 restart vrc-gallery     # or ./scripts/prod.sh
 | `PHOTO_TZ_OFFSET` | `+08:00` | Timezone offset for VRChat filename dates (no TZ in filename) |
 | `PHOTO_TZ` | `Asia/Taipei` | IANA timezone for gallery day/month grouping, month filter, and stats (server) |
 | `CORS_ORIGIN` | reflect request origin | Allowed CORS origin (set explicitly in production) |
-| `TRUST_PROXY` | unset | Set to `1` behind a reverse proxy so admin IP checks use `X-Forwarded-For` / `X-Real-IP` |
-| `ADMIN_PASSWORD` | unset | Admin password; when set, `/api/admin/*` mutations require login cookie in addition to private IP |
+| `TRUST_PROXY` | unset | `1` behind a reverse proxy; use `0` for direct HTTP LAN access without a proxy |
+| `ADMIN_PASSWORD` | unset | Admin password; when set, internal clients must log in after passing the IP check |
 | `ADMIN_JWT_SECRET` | derived from password | HMAC secret for admin session cookie (set a dedicated random value in production) |
 | `ADMIN_SESSION_HOURS` | `24` | Admin session lifetime |
-| `ADMIN_COOKIE_SECURE` | `1` in production | Set `Secure` flag on admin cookie (auto-enabled when `NODE_ENV=production`) |
+| `ADMIN_COOKIE_SECURE` | auto | `1`/`0` to force; otherwise `Secure` only when the request is HTTPS |
 
-When `TRUST_PROXY` is unset, forwarded headers are still trusted if the direct connection comes from a private IP (typical reverse-proxy setup).
+When `TRUST_PROXY` is unset, forwarded headers are still trusted if the direct connection comes from a private IP (typical reverse-proxy setup). For a bare Node process on a home LAN (`http://192.168.x.x:8787`), set `TRUST_PROXY=0` so the real client IP is used for admin access checks.
 
 **Dev-only (Vite):**
 
@@ -217,15 +217,38 @@ Sync and catalog load **skip** non-image files and directories in `photos/` (e.g
 - **API:** `/api/admin/*` (same IP restriction; returns `302` redirect to `/` for public IPs)
 - **Dual protection:** private-network IP check **plus** `ADMIN_PASSWORD` session cookie. External visitors are redirected away from `/admin`; internal clients see the login form.
 
+### Access matrix
+
+| Client | `/admin` | `/api/admin/*` |
+|--------|----------|----------------|
+| Private IP (RFC 1918, loopback, link-local) | Login form → password → admin UI | Requires valid session cookie when `ADMIN_PASSWORD` is set |
+| Public IP | `302` redirect to `/` | `302` redirect to `/` |
+
+### Session cookie (`vrc_admin`)
+
+- HttpOnly, `SameSite=Strict`, signed HMAC token
+- **`Secure` flag is set only on HTTPS** (or when `ADMIN_COOKIE_SECURE=1`). Plain HTTP LAN access (e.g. `http://192.168.x.x:8787/admin`) must **not** use `Secure`, or the browser will drop the cookie and login will appear to succeed but subsequent API calls return 401.
+- Force behavior with `ADMIN_COOKIE_SECURE`: `0` = never `Secure`; `1` = always `Secure` (HTTPS only).
+
+### `TRUST_PROXY` for admin IP checks
+
+| Setup | `TRUST_PROXY` | Notes |
+|-------|---------------|-------|
+| Direct LAN access (`http://192.168.x.x:8787`) | `0` or unset | Client IP is the browser's LAN address |
+| Behind nginx/Caddy on HTTPS | `1` | Proxy must send `X-Forwarded-For` / `X-Real-IP` |
+| PM2 on same host, no proxy | `0` | Match `.env`; do not trust forwarded headers |
+
+If admin redirects to `/` from a LAN IP, check `GET /api/admin/access` — response includes `privateNetwork` and `clientIp` for debugging.
+
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/admin/access` | `{ ok, admin, authRequired, authenticated }` — IP check only |
+| `GET` | `/api/admin/access` | `{ ok, admin, authRequired, authenticated, privateNetwork, clientIp }` |
 | `POST` | `/api/admin/login` | `{ password }` → sets HttpOnly `vrc_admin` cookie |
 | `POST` | `/api/admin/logout` | Clears admin cookie |
 
 All routes below also require a valid admin session cookie when `ADMIN_PASSWORD` is set:
 
-From a private-network IP (RFC 1918, loopback, link-local):
+From a private-network IP:
 
 | Method | Path | Description |
 |--------|------|-------------|

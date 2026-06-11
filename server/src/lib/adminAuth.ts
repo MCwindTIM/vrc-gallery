@@ -131,27 +131,39 @@ export function adminAccessStatus(req: Request): AdminAccessStatus {
   };
 }
 
-function cookieFlags(maxAgeSec: number): string {
-  const secure =
-    process.env.ADMIN_COOKIE_SECURE === "1" ||
-    process.env.NODE_ENV === "production"
-      ? "; Secure"
-      : "";
-  return `HttpOnly; Path=/; Max-Age=${maxAgeSec}; SameSite=Strict${secure}`;
+function isHttpsRequest(req: Request): boolean {
+  if (req.secure) return true;
+  const proto = req.headers["x-forwarded-proto"];
+  if (typeof proto === "string") {
+    return proto.split(",")[0]?.trim().toLowerCase() === "https";
+  }
+  return false;
 }
 
-export function setAdminCookie(res: Response, token: string): void {
+/** Secure cookies are rejected on plain HTTP — only enable on HTTPS unless forced. */
+export function shouldUseSecureAdminCookie(req: Request): boolean {
+  if (process.env.ADMIN_COOKIE_SECURE === "0") return false;
+  if (process.env.ADMIN_COOKIE_SECURE === "1") return true;
+  return isHttpsRequest(req);
+}
+
+function cookieFlags(maxAgeSec: number, secure: boolean): string {
+  const secureFlag = secure ? "; Secure" : "";
+  return `HttpOnly; Path=/; Max-Age=${maxAgeSec}; SameSite=Strict${secureFlag}`;
+}
+
+export function setAdminCookie(res: Response, req: Request, token: string): void {
   const maxAgeSec = Math.floor(sessionTtlMs() / 1000);
   res.setHeader(
     "Set-Cookie",
-    `${ADMIN_COOKIE}=${encodeURIComponent(token)}; ${cookieFlags(maxAgeSec)}`
+    `${ADMIN_COOKIE}=${encodeURIComponent(token)}; ${cookieFlags(maxAgeSec, shouldUseSecureAdminCookie(req))}`
   );
 }
 
-export function clearAdminCookie(res: Response): void {
+export function clearAdminCookie(res: Response, req: Request): void {
   res.setHeader(
     "Set-Cookie",
-    `${ADMIN_COOKIE}=; ${cookieFlags(0)}`
+    `${ADMIN_COOKIE}=; ${cookieFlags(0, shouldUseSecureAdminCookie(req))}`
   );
 }
 

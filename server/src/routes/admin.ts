@@ -39,7 +39,7 @@ adminRouter.post("/login", (req, res) => {
   }
 
   const token = createAdminToken();
-  setAdminCookie(res, token);
+  setAdminCookie(res, req, token);
   res.json({
     ok: true,
     admin: true,
@@ -48,8 +48,8 @@ adminRouter.post("/login", (req, res) => {
   });
 });
 
-adminRouter.post("/logout", (_req, res) => {
-  clearAdminCookie(res);
+adminRouter.post("/logout", (req, res) => {
+  clearAdminCookie(res, req);
   res.json({ ok: true });
 });
 
