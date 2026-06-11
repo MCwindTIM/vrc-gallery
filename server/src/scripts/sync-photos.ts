@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 import { resolvePhotoCreateDate } from "../lib/photoDate.js";
+import { isPhotoFilename } from "../lib/imageFile.js";
 import { parsePhotoAnnotation } from "../lib/photoMetadata.js";
 import { PHOTOS_DIR, CATALOG_PATH } from "../lib/paths.js";
 import { ensureThumb } from "../lib/thumbnail.js";
@@ -21,33 +22,56 @@ async function scan(): Promise<PhotoRecord[]> {
     process.exit(1);
   }
 
-  const images = entries.filter((f) => /\.(jpe?g|png|webp)$/i.test(f));
   const photos: PhotoRecord[] = [];
+  const skipped: string[] = [];
 
-  for (const file of images) {
-    const id = idFromFilename(file);
-    const srcPath = path.join(PHOTOS_DIR, file);
-    const thumbName = `${id}_thumb.jpg`;
-    const thumbFs = path.join(PHOTOS_DIR, "thumbs", thumbName);
-    await ensureThumb(srcPath, thumbFs);
+  for (const entry of entries) {
+    if (!isPhotoFilename(entry)) continue;
 
-    const meta = await sharp(srcPath).metadata();
-    const stat = await fs.stat(srcPath);
-    const created = resolvePhotoCreateDate(path.parse(file).name, meta, stat.birthtime);
+    const srcPath = path.join(PHOTOS_DIR, entry);
+    try {
+      const stat = await fs.stat(srcPath);
+      if (!stat.isFile()) continue;
+    } catch {
+      continue;
+    }
 
-    const annotation = parsePhotoAnnotation(meta.xmp);
+    try {
+      const id = idFromFilename(entry);
+      const thumbName = `${id}_thumb.jpg`;
+      const thumbFs = path.join(PHOTOS_DIR, "thumbs", thumbName);
+      await ensureThumb(srcPath, thumbFs);
 
-    photos.push({
-      id,
-      name: path.parse(file).name,
-      url: `/photos/${file}`,
-      thumb: `/photos/thumbs/${thumbName}`,
-      date: created.toISOString(),
-      width: meta.width ?? 0,
-      height: meta.height ?? 0,
-      year: created.getFullYear(),
-      ...(annotation ? { annotation } : {}),
-    });
+      const meta = await sharp(srcPath).metadata();
+      const stat = await fs.stat(srcPath);
+      const created = resolvePhotoCreateDate(
+        path.parse(entry).name,
+        meta,
+        stat.birthtime
+      );
+
+      const annotation = parsePhotoAnnotation(meta.xmp);
+
+      photos.push({
+        id,
+        name: path.parse(entry).name,
+        url: `/photos/${entry}`,
+        thumb: `/photos/thumbs/${thumbName}`,
+        date: created.toISOString(),
+        width: meta.width ?? 0,
+        height: meta.height ?? 0,
+        year: created.getFullYear(),
+        ...(annotation ? { annotation } : {}),
+      });
+    } catch (err) {
+      skipped.push(entry);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`Skipped ${entry}: ${msg}`);
+    }
+  }
+
+  if (skipped.length) {
+    console.warn(`Skipped ${skipped.length} non-photo or unreadable file(s)`);
   }
 
   return photos.sort(

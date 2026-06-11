@@ -3,12 +3,11 @@ import path from "node:path";
 import sharp from "sharp";
 import { resolvePhotoCreateDate } from "../lib/photoDate.js";
 import { parsePhotoAnnotation } from "../lib/photoMetadata.js";
+import { isPhotoFilename } from "../lib/imageFile.js";
 import { PHOTOS_DIR } from "../lib/paths.js";
 import { ensureThumb } from "../lib/thumbnail.js";
 import type { PhotoAnnotation, PhotoRecord } from "../lib/types.js";
 import { loadCatalog, saveCatalog } from "./photoCatalog.js";
-
-const IMAGE_EXT = /\.(jpe?g|png|webp)$/i;
 
 function idFromFilename(filename: string): string {
   return path.basename(filename, path.extname(filename));
@@ -69,8 +68,8 @@ export async function ingestUploadedFile(
   filename: string
 ): Promise<PhotoRecord> {
   const safe = safeBasename(filename);
-  if (!IMAGE_EXT.test(safe)) {
-    throw new Error("Only JPEG, PNG, and WebP images are supported");
+  if (!isPhotoFilename(safe)) {
+    throw new Error("Skipped non-image file");
   }
 
   const catalog = await loadCatalog();

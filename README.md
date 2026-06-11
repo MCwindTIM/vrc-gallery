@@ -9,7 +9,7 @@ Full-stack photo gallery for [vrc.mcwind.cloud](https://vrc.mcwind.cloud) — br
 - **Lightbox** — prev/next scoped to the active month filter (including cross-page neighbors via API); swipe/drag horizontally to change photos; keyboard ← → / Esc / R (rotate); load progress for large images with browser-cache awareness
 - **VRChat metadata** — capture date from XMP `CreateDate` or `VRChat_YYYY-MM-DD_…` filenames; optional annotations (world, author, description, in-game comment) from embedded XMP
 - **Admin panel** (`/admin`, internal network only) — upload (drag-and-drop, up to 10 files), edit metadata, rename, delete
-- **Catalog sync** — CLI scans `photos/`, generates JPEG thumbnails, writes `data/photos.json`; catalog reloads automatically when the file changes on disk
+- **Catalog sync** — CLI scans `photos/`, generates JPEG thumbnails, writes `data/photos.json`; non-image files (e.g. `photos.json`, `thumbs/`) are skipped automatically; catalog reloads when the file changes on disk
 - **Backward compatible** — `GET /photos.json` serves the legacy flat catalog format
 
 ### Gallery URL
@@ -26,9 +26,11 @@ npm workspaces monorepo:
 vrc-gallery/
 ├── client/          # React SPA (Vite) → client/dist/ after build
 ├── server/          # Express API → server/dist/ after build
-├── scripts/         # deploy.sh, prod.sh
+├── scripts/         # deploy.sh, prod.sh, docker-import.sh
 ├── photos/          # Full-size images + thumbs/ (gitignored)
 ├── data/            # photos.json catalog (gitignored)
+├── Dockerfile
+├── docker-compose.yml
 ├── ecosystem.config.cjs
 ├── .env.example
 └── package.json
@@ -36,7 +38,7 @@ vrc-gallery/
 
 ## Stack
 
-- **Client:** React 19, Vite 6, Tailwind CSS 4, Framer Motion
+- **Client:** React 19, Vite 6, Tailwind CSS 4, Framer Motion; fonts loaded via Google Fonts CDN (`fonts.loli.net` in mainland China, `fonts.googleapis.com` elsewhere)
 - **Server:** Express 5, TypeScript, Sharp (thumbnails + metadata), Multer (uploads)
 
 ## Development
@@ -108,6 +110,44 @@ pm2 start ecosystem.config.cjs
 
 Customize env in `ecosystem.config.cjs` or override at runtime. PM2 runs `npm start`, so catalog sync runs on each (re)start.
 
+### Docker
+
+Build and run with Docker Compose:
+
+```bash
+mkdir -p photos data
+docker compose up -d --build
+```
+
+App listens on http://localhost:8787. `npm start` inside the container runs `sync-photos:prod` on each start.
+
+**Import a pre-built image** (e.g. on another machine or Portainer):
+
+```bash
+docker load -i vrc-gallery-image.tar
+./scripts/docker-import.sh   # load image + docker compose up -d
+```
+
+**Volume mapping** — use **two separate** mounts; do not map the same volume to both paths:
+
+| Host / volume | Container path | Contents |
+|---------------|----------------|----------|
+| `./photos` or `vrc-gallery-photos` | `/app/photos` | Original images + `thumbs/` |
+| `./data` or `vrc-gallery-data` | `/app/data` | `photos.json` only |
+
+Expected layout:
+
+```
+photos/
+  image.png
+  thumbs/
+    image_thumb.jpg
+data/
+  photos.json
+```
+
+In Portainer: **Images → Import** to upload `vrc-gallery-image.tar`, then deploy via **Stacks** with `docker-compose.yml`. Set `TRUST_PROXY=1` when behind a reverse proxy.
+
 ### Update deploy
 
 ```bash
@@ -149,6 +189,8 @@ When `TRUST_PROXY` is unset, forwarded headers are still trusted if the direct c
 
 This writes `photos/thumbs/{id}_thumb.jpg` (max 640px, JPEG quality 82) and updates `data/photos.json`.
 
+Sync and catalog load **skip** non-image files and directories in `photos/` (e.g. stray `photos.json`, `thumbs/`, other extensions) without failing. Unreadable image files are logged and skipped during sync. Admin upload silently ignores non-image files in a batch.
+
 **Capture date** (in priority order):
 
 1. XMP `CreateDate` or `tiff:DateTime`
@@ -168,7 +210,7 @@ From a private-network IP (RFC 1918, loopback, link-local):
 |--------|------|-------------|
 | `GET` | `/api/admin/access` | Check admin access |
 | `GET` | `/api/admin/photos` | Full catalog (with IDs) |
-| `POST` | `/api/admin/photos` | Upload images (`multipart/form-data`, field `files`, max 10 × 50 MB) |
+| `POST` | `/api/admin/photos` | Upload images (`multipart/form-data`, field `files`, max 10 × 50 MB); non-image files in the batch are skipped |
 | `PATCH` | `/api/admin/photos/:id` | Update `name`, `date`, `annotation` |
 | `DELETE` | `/api/admin/photos/:id` | Remove image, thumbnail, and catalog entry |
 

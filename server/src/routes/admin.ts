@@ -25,11 +25,7 @@ const upload = multer({
   }),
   limits: { fileSize: 50 * 1024 * 1024, files: 10 },
   fileFilter: (_req, file, cb) => {
-    if (/\.(jpe?g|png|webp)$/i.test(file.originalname)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only JPEG, PNG, and WebP images are supported"));
-    }
+    cb(null, /\.(jpe?g|png|webp)$/i.test(file.originalname));
   },
 });
 
@@ -50,7 +46,7 @@ adminRouter.post("/photos", upload.array("files", 10), async (req, res, next) =>
   try {
     const files = req.files as Express.Multer.File[] | undefined;
     if (!files?.length) {
-      res.status(400).json({ error: "No files uploaded" });
+      res.status(201).json({ created: [], errors: [] });
       return;
     }
 

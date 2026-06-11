@@ -1,7 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { isReadablePhotoFile } from "../lib/imageFile.js";
 import type { PhotoCatalog, PhotoRecord, PhotosQuery } from "../lib/types.js";
-import { CATALOG_PATH } from "../lib/paths.js";
+import { CATALOG_PATH, PHOTOS_DIR } from "../lib/paths.js";
 
 let cache: PhotoCatalog | null = null;
 let catalogMtimeMs = 0;
@@ -28,8 +29,16 @@ export async function loadCatalog(force = false): Promise<PhotoCatalog> {
 
   const raw = await fs.readFile(CATALOG_PATH, "utf-8");
   const list = JSON.parse(raw) as Array<Omit<PhotoRecord, "id" | "year">>;
-  const photos = list
-    .map((p) => enrich(p))
+  const enriched = await Promise.all(
+    list.map(async (p) => {
+      const record = enrich(p);
+      const srcPath = path.join(PHOTOS_DIR, path.basename(record.url));
+      if (!(await isReadablePhotoFile(srcPath))) return null;
+      return record;
+    })
+  );
+  const photos = enriched
+    .filter((p): p is PhotoRecord => p !== null)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   catalogMtimeMs = mtime;
