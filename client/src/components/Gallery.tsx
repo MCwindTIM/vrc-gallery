@@ -161,7 +161,7 @@ export function Gallery({
                           className="transition duration-500 group-hover:scale-[1.02]"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-void)]/90 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
-                        <p className="font-ui absolute bottom-0 left-0 right-0 translate-y-2 p-3 text-sm font-medium opacity-0 transition group-hover:translate-y-0 group-hover:opacity-100">
+                        <p className="font-mixed-cjk absolute bottom-0 left-0 right-0 translate-y-2 p-3 text-sm font-medium opacity-0 transition group-hover:translate-y-0 group-hover:opacity-100">
                           {photo.name}
                         </p>
                       </div>

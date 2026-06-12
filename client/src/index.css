@@ -38,7 +38,9 @@ button,
   font-family: var(--font-ui);
 }
 
-.font-handwritten-name {
+/* Mixed simplified + traditional user text (VRChat names, photo titles, authors) */
+.font-handwritten-name,
+.font-mixed-cjk {
   font-family: var(--font-handwritten-name);
 }
 

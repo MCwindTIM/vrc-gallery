@@ -366,7 +366,7 @@ function PhotoMetaPanel({
     <div className="min-w-0 space-y-3">
       <div className="min-w-0">
         <h3
-          className={`font-ui break-words font-medium leading-snug text-neutral-100 ${
+          className={`font-mixed-cjk break-words font-medium leading-snug text-neutral-100 ${
             compact ? "text-sm sm:text-base" : "text-base sm:text-lg"
           }`}
         >
@@ -420,7 +420,9 @@ function PhotoAnnotationBlock({ annotation }: { annotation: PhotoAnnotation }) {
         {rows.map(({ label, value }) => (
           <div key={label}>
             <dt className="text-xs text-neutral-500">{label}</dt>
-            <dd className="mt-0.5 break-words leading-snug text-neutral-200">{value}</dd>
+            <dd className="font-mixed-cjk mt-0.5 break-words leading-snug text-neutral-200">
+              {value}
+            </dd>
           </div>
         ))}
       </dl>
