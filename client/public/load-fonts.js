@@ -49,4 +49,12 @@
   }
 
   injectStylesheet(primary, true);
+
+  // Handwritten kai with full simplified + traditional coverage (VRChat display names, etc.)
+  preconnect("https://cdn.jsdelivr.net");
+  var wenkai = document.createElement("link");
+  wenkai.rel = "stylesheet";
+  wenkai.href =
+    "https://cdn.jsdelivr.net/npm/lxgw-wenkai-lite-webfont@1.7.0/style.css";
+  document.head.appendChild(wenkai);
 })();

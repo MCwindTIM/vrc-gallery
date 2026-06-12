@@ -38,7 +38,7 @@ vrc-gallery/
 
 ## Stack
 
-- **Client:** React 19, Vite 6, Tailwind CSS 4, Framer Motion; fonts via Google Fonts CDN (`fonts.loli.net` in mainland China, `fonts.googleapis.com` elsewhere) — `Noto Sans TC` + `Noto Sans SC` (SC fills simplified-only glyphs e.g. 满), `Klee One` for body
+- **Client:** React 19, Vite 6, Tailwind CSS 4, Framer Motion; fonts via Google Fonts CDN (`fonts.loli.net` / `fonts.googleapis.com`) — `Klee One` for handwritten body; `LXGW WenKai Lite` for mixed-script display names; `Noto Sans TC` + `Noto Sans SC` for UI / photo titles
 - **Server:** Express 5, TypeScript, Sharp (thumbnails + metadata), Multer (uploads)
 
 ## Development

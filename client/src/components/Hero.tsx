@@ -29,11 +29,19 @@ export function Hero({ stats, onExplore }: HeroProps) {
           transition={{ duration: 0.7, delay: 0.12 }}
           className="mt-4 max-w-xl text-lg text-[var(--color-muted)] md:text-xl"
         >
-          VRChat: <a href="https://vrchat.com/home/user/usr_4f87a0f1-844b-4b84-a3fd-e4b729c75fb0" target="_blank" rel="noopener noreferrer" className="underline">土豆不是马铃薯</a><br></br>
+          VRChat:{" "}
+          <a
+            href="https://vrchat.com/home/user/usr_4f87a0f1-844b-4b84-a3fd-e4b729c75fb0"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-handwritten-name underline"
+          >
+            土豆不是马铃薯
+          </a>
+          <br />
           珍藏與大家在VRChat的點點滴滴
           <span className="mx-2 text-[var(--color-border)]">·</span>
           <span className="text-[var(--color-accent-2)]">Memories from the VRChat</span>
-          <br></br>
         </motion.p>
 
         <motion.div

@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-  --font-handwritten: "Klee One", "Noto Sans TC", "Noto Sans SC", cursive;
+  --font-handwritten: "Klee One", "Zen Kurenaido", "Noto Sans TC", "Noto Sans SC", cursive;
+  --font-handwritten-name: "LXGW WenKai Lite", "LXGW WenKai", "Klee One", cursive;
   --font-ui: "Noto Sans TC", "Noto Sans SC", system-ui, sans-serif;
   --color-void: #fff8fc;
   --color-surface: #fff1f7;
@@ -35,6 +36,10 @@ body {
 button,
 .font-ui {
   font-family: var(--font-ui);
+}
+
+.font-handwritten-name {
+  font-family: var(--font-handwritten-name);
 }
 
 ::selection {
