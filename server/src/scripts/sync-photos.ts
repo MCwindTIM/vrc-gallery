@@ -13,7 +13,48 @@ function idFromFilename(filename: string): string {
   return path.basename(filename, path.extname(filename));
 }
 
-async function scan(): Promise<PhotoRecord[]> {
+async function loadExistingById(): Promise<Map<string, PhotoRecord>> {
+  const map = new Map<string, PhotoRecord>();
+  try {
+    const raw = await fs.readFile(CATALOG_PATH, "utf-8");
+    const list = JSON.parse(raw) as Array<
+      Omit<PhotoRecord, "id" | "year"> & { id?: string }
+    >;
+    for (const entry of list) {
+      const id = entry.id ?? idFromFilename(path.basename(entry.url));
+      map.set(id, { ...entry, id, year: new Date(entry.date).getFullYear() });
+    }
+  } catch {
+    /* first sync */
+  }
+  return map;
+}
+
+/** Keep admin-edited catalog fields when re-scanning files on disk. */
+function mergeExistingRecord(
+  fresh: PhotoRecord,
+  existing?: PhotoRecord
+): PhotoRecord {
+  if (!existing) return fresh;
+
+  const merged: PhotoRecord = {
+    ...fresh,
+    date: existing.date,
+    year: new Date(existing.date).getFullYear(),
+  };
+
+  if (existing.displayOrientation) {
+    merged.displayOrientation = existing.displayOrientation;
+  }
+
+  if (existing.annotation) {
+    merged.annotation = existing.annotation;
+  }
+
+  return merged;
+}
+
+async function scan(existingById: Map<string, PhotoRecord>): Promise<PhotoRecord[]> {
   let entries: string[];
   try {
     entries = await fs.readdir(PHOTOS_DIR);
@@ -52,17 +93,22 @@ async function scan(): Promise<PhotoRecord[]> {
 
       const annotation = parsePhotoAnnotation(meta.xmp);
 
-      photos.push({
-        id,
-        name: path.parse(entry).name,
-        url: `/photos/${entry}`,
-        thumb: thumbUrl(id),
-        date: created.toISOString(),
-        width: meta.width ?? 0,
-        height: meta.height ?? 0,
-        year: created.getFullYear(),
-        ...(annotation ? { annotation } : {}),
-      });
+      photos.push(
+        mergeExistingRecord(
+          {
+            id,
+            name: path.parse(entry).name,
+            url: `/photos/${entry}`,
+            thumb: thumbUrl(id),
+            date: created.toISOString(),
+            width: meta.width ?? 0,
+            height: meta.height ?? 0,
+            year: created.getFullYear(),
+            ...(annotation ? { annotation } : {}),
+          },
+          existingById.get(id)
+        )
+      );
     } catch (err) {
       skipped.push(entry);
       const msg = err instanceof Error ? err.message : String(err);
@@ -80,7 +126,8 @@ async function scan(): Promise<PhotoRecord[]> {
 }
 
 async function main() {
-  const photos = await scan();
+  const existingById = await loadExistingById();
+  const photos = await scan(existingById);
   await saveCatalog(photos);
   console.log(`Synced ${photos.length} photos → ${CATALOG_PATH}`);
 }

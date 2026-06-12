@@ -6,6 +6,7 @@ import { parsePhotoAnnotation } from "../lib/photoMetadata.js";
 import { isPhotoFilename } from "../lib/imageFile.js";
 import { PHOTOS_DIR } from "../lib/paths.js";
 import { ensureThumb, thumbFilename, thumbUrl } from "../lib/thumbnail.js";
+import { parseDisplayOrientation } from "../lib/photoDisplay.js";
 import type { PhotoAnnotation, PhotoRecord } from "../lib/types.js";
 import { loadCatalog, saveCatalog } from "./photoCatalog.js";
 
@@ -88,6 +89,7 @@ export interface PhotoUpdateInput {
   name?: string;
   date?: string;
   annotation?: PhotoAnnotation;
+  displayOrientation?: PhotoRecord["displayOrientation"] | "auto" | null;
 }
 
 export async function updatePhoto(
@@ -150,6 +152,15 @@ export async function updatePhoto(
     if (ann.userComment?.trim()) cleaned.userComment = ann.userComment.trim();
     updated.annotation =
       Object.keys(cleaned).length > 0 ? cleaned : undefined;
+  }
+
+  if (input.displayOrientation !== undefined) {
+    const parsed = parseDisplayOrientation(input.displayOrientation);
+    if (parsed) {
+      updated.displayOrientation = parsed;
+    } else {
+      delete updated.displayOrientation;
+    }
   }
 
   const photos = [...catalog.photos];

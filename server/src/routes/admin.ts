@@ -110,12 +110,19 @@ adminRouter.post("/photos", upload.array("files", 10), async (req, res, next) =>
 
 adminRouter.patch("/photos/:id", async (req, res, next) => {
   try {
-    const { name, date, annotation } = req.body ?? {};
+    const { name, date, annotation, displayOrientation } = req.body ?? {};
     const photo = await updatePhoto(req.params.id, {
       name: typeof name === "string" ? name : undefined,
       date: typeof date === "string" ? date : undefined,
       annotation:
         annotation && typeof annotation === "object" ? annotation : undefined,
+      displayOrientation:
+        displayOrientation === "auto" ||
+        displayOrientation === "portrait" ||
+        displayOrientation === "landscape" ||
+        displayOrientation === null
+          ? displayOrientation
+          : undefined,
     });
     res.json({ photo });
   } catch (err) {
@@ -127,7 +134,8 @@ adminRouter.patch("/photos/:id", async (req, res, next) => {
       if (
         err.message.includes("already exists") ||
         err.message.includes("empty") ||
-        err.message.includes("Invalid")
+        err.message.includes("Invalid") ||
+        err.message.includes("orientation")
       ) {
         res.status(400).json({ error: err.message });
         return;

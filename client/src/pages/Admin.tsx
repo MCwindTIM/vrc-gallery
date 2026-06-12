@@ -13,6 +13,9 @@ import {
   type AdminAccessStatus,
 } from "../lib/adminApi";
 import { formatDateTime } from "../lib/format";
+import { photoDisplayOrientationLabel } from "../lib/photoDisplay";
+import { PhotoThumb } from "../components/PhotoThumb";
+import type { PhotoDisplayOrientation } from "../lib/photoDisplay";
 
 function formatDate(iso: string): string {
   return formatDateTime(iso);
@@ -28,6 +31,7 @@ function toDatetimeLocal(iso: string): string {
 interface EditForm {
   name: string;
   date: string;
+  displayOrientation: PhotoDisplayOrientation;
   world: string;
   author: string;
   description: string;
@@ -38,6 +42,7 @@ function photoToForm(photo: Photo): EditForm {
   return {
     name: photo.name,
     date: toDatetimeLocal(photo.date),
+    displayOrientation: photo.displayOrientation ?? "auto",
     world: photo.annotation?.world ?? "",
     author: photo.annotation?.author ?? "",
     description: photo.annotation?.description ?? "",
@@ -55,6 +60,7 @@ function formToPayload(form: EditForm) {
   return {
     name: form.name.trim(),
     date: new Date(form.date).toISOString(),
+    displayOrientation: form.displayOrientation,
     annotation,
   };
 }
@@ -380,25 +386,26 @@ export default function Admin() {
         {loading ? (
           <p className="text-center text-muted font-ui py-12">載入中…</p>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="columns-1 gap-4 sm:columns-2 lg:columns-3">
             {photos.map((photo) => (
               <article
                 key={photo.id}
-                className="rounded-2xl border border-border bg-panel overflow-hidden shadow-sm"
+                className="mb-4 break-inside-avoid rounded-2xl border border-border bg-panel overflow-hidden shadow-sm"
               >
-                <div className="aspect-video bg-surface overflow-hidden">
-                  <img
-                    src={photo.thumb}
-                    alt={photo.name}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                  />
+                <div className="bg-surface overflow-hidden">
+                  <PhotoThumb photo={photo} />
                 </div>
                 <div className="p-4 space-y-2">
                   <h2 className="font-ui font-medium text-text truncate" title={photo.name}>
                     {photo.name}
                   </h2>
                   <p className="text-xs font-ui text-muted">
+                    {photoDisplayOrientationLabel(
+                      photo.width,
+                      photo.height,
+                      photo.displayOrientation
+                    )}
+                    {" · "}
                     {formatDate(photo.date)}
                     {photo.annotation?.world && (
                       <span className="block truncate mt-0.5" title={photo.annotation.world}>
@@ -465,6 +472,42 @@ export default function Admin() {
                   className="mt-1 w-full rounded-lg border border-border bg-void px-3 py-2 text-text outline-none focus:border-accent"
                 />
               </label>
+              <fieldset className="block">
+                <legend className="text-muted text-xs">顯示方向</legend>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(
+                    [
+                      ["auto", "自動（依像素）"],
+                      ["portrait", "直向"],
+                      ["landscape", "橫向"],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <label
+                      key={value}
+                      className={`cursor-pointer rounded-lg border px-3 py-2 text-sm transition ${
+                        editForm.displayOrientation === value
+                          ? "border-accent bg-accent/10 text-text"
+                          : "border-border text-muted hover:border-accent/40"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="displayOrientation"
+                        value={value}
+                        checked={editForm.displayOrientation === value}
+                        onChange={() =>
+                          setEditForm({
+                            ...editForm,
+                            displayOrientation: value,
+                          })
+                        }
+                        className="sr-only"
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
               <label className="block">
                 <span className="text-muted text-xs">世界 (World)</span>
                 <input

@@ -1,3 +1,5 @@
+import type { PhotoDisplayOrientation } from "./photoDisplay.js";
+
 export interface PhotoAnnotation {
   world?: string;
   author?: string;
@@ -14,6 +16,7 @@ export interface PhotoRecord {
   width: number;
   height: number;
   year: number;
+  displayOrientation?: PhotoDisplayOrientation;
   annotation?: PhotoAnnotation;
 }
 

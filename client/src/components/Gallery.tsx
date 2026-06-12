@@ -6,8 +6,8 @@ import {
   formatMonthLabel,
   photoLocalDateKey,
   photoLocalMonthKey,
-  aspectRatio,
 } from "../lib/format";
+import { PhotoThumb } from "./PhotoThumb";
 import { useInfiniteScroll } from "../hooks/useInfiniteScroll";
 import { usePhotoNeighbors } from "../hooks/usePhotoNeighbors";
 import { MonthFilter } from "./MonthFilter";
@@ -154,21 +154,11 @@ export function Gallery({
                       onClick={() => setActive(photo)}
                       className="group mb-4 block w-full break-inside-avoid overflow-hidden text-left transition"
                     >
-                      <div className="relative w-full overflow-hidden">
-                        <img
-                          src={photo.thumb}
-                          alt={photo.name}
-                          loading="lazy"
-                          decoding="async"
+                      <div className="relative w-full overflow-hidden transition duration-500 group-hover:scale-[1.02]">
+                        <PhotoThumb
+                          photo={photo}
                           sizes={THUMB_SIZES}
-                          width={photo.width}
-                          height={photo.height}
-                          className="w-full object-cover transition duration-500 group-hover:scale-[1.02]"
-                          style={{
-                            aspectRatio: String(
-                              aspectRatio(photo.width, photo.height)
-                            ),
-                          }}
+                          className="transition duration-500 group-hover:scale-[1.02]"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-void)]/90 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
                         <p className="font-ui absolute bottom-0 left-0 right-0 translate-y-2 p-3 text-sm font-medium opacity-0 transition group-hover:translate-y-0 group-hover:opacity-100">

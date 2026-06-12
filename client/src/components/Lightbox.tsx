@@ -2,6 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Photo, PhotoAnnotation } from "../types";
 import { formatDateTime } from "../lib/format";
+import {
+  getPhotoDisplayLayout,
+  photoDisplayOrientationLabel,
+} from "../lib/photoDisplay";
 import { useImageLoadProgress } from "../hooks/useImageLoadProgress";
 import { computeRotatedImageLayout } from "../lib/rotatedImageFit";
 
@@ -72,16 +76,27 @@ export function Lightbox({
     };
   }, [photo?.id]);
 
+  const displayLayout = useMemo(() => {
+    if (!photo) return null;
+    return getPhotoDisplayLayout(
+      photo.width,
+      photo.height,
+      photo.displayOrientation
+    );
+  }, [photo]);
+
   const layout = useMemo(() => {
-    if (!photo || stageSize.w < 1 || stageSize.h < 1) return null;
+    if (!photo || !displayLayout || stageSize.w < 1 || stageSize.h < 1) {
+      return null;
+    }
     return computeRotatedImageLayout(
       photo.width,
       photo.height,
-      rotation,
+      displayLayout.rotate + rotation,
       stageSize.w,
       stageSize.h
     );
-  }, [photo, rotation, stageSize]);
+  }, [photo, displayLayout, rotation, stageSize]);
 
   useEffect(() => {
     const img = imageRef.current;
@@ -113,8 +128,8 @@ export function Lightbox({
           : dragX < 0 && !hasNext
             ? ` translateX(${dragX * 0.25}px)`
             : ` translateX(${dragX}px)`;
-    return `translate(-50%, -50%)${drag} rotate(${rotation}deg)`;
-  }, [dragX, hasPrev, hasNext, rotation]);
+    return `translate(-50%, -50%)${drag} rotate(${(displayLayout?.rotate ?? 0) + rotation}deg)`;
+  }, [dragX, displayLayout?.rotate, hasPrev, hasNext, rotation]);
 
   const resetSwipe = () => {
     swipeRef.current.axis = null;
@@ -362,6 +377,11 @@ function PhotoMetaPanel({
           {!compact && (
             <span className="text-neutral-500">
               {" "}
+              · {photoDisplayOrientationLabel(
+                photo.width,
+                photo.height,
+                photo.displayOrientation
+              )}{" "}
               · {photo.width} × {photo.height}
             </span>
           )}
