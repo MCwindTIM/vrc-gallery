@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-  --font-handwritten: "Klee One", "Zen Kurenaido", cursive;
-  --font-ui: "Noto Sans TC", system-ui, sans-serif;
+  --font-handwritten: "Klee One", "Noto Sans TC", "Noto Sans SC", cursive;
+  --font-ui: "Noto Sans TC", "Noto Sans SC", system-ui, sans-serif;
   --color-void: #fff8fc;
   --color-surface: #fff1f7;
   --color-panel: #ffffff;

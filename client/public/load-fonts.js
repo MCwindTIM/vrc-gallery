@@ -1,6 +1,6 @@
 (function () {
   var QUERY =
-    "family=Klee+One:wght@400;600&family=Noto+Sans+TC:wght@400;500;700&display=swap";
+    "family=Klee+One:wght@400;600&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap";
   var CN = "https://fonts.loli.net";
   var CN_GSTATIC = "https://gstatic.loli.net";
   var INTL = "https://fonts.googleapis.com";
