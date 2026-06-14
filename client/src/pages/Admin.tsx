@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { Photo, PhotoAnnotation } from "../types";
 import {
   AdminAccessError,
@@ -68,6 +68,8 @@ function formToPayload(form: EditForm) {
   };
 }
 
+type VisibilityFilter = "all" | "visible" | "hidden";
+
 export default function Admin() {
   const [access, setAccess] = useState<AdminAccessStatus | null>(null);
   const [password, setPassword] = useState("");
@@ -83,6 +85,27 @@ export default function Admin() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [visibilityFilter, setVisibilityFilter] =
+    useState<VisibilityFilter>("all");
+
+  const visibilityCounts = useMemo(() => {
+    const hidden = photos.filter((p) => p.hidden).length;
+    return {
+      total: photos.length,
+      visible: photos.length - hidden,
+      hidden,
+    };
+  }, [photos]);
+
+  const filteredPhotos = useMemo(() => {
+    if (visibilityFilter === "visible") {
+      return photos.filter((p) => !p.hidden);
+    }
+    if (visibilityFilter === "hidden") {
+      return photos.filter((p) => p.hidden);
+    }
+    return photos;
+  }, [photos, visibilityFilter]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -308,7 +331,11 @@ export default function Admin() {
               相簿管理
             </h1>
             <p className="text-xs font-ui text-muted mt-0.5">
-              {loading ? "載入中…" : `共 ${photos.length} 張`}
+              {loading
+                ? "載入中…"
+                : visibilityFilter === "all"
+                  ? `共 ${visibilityCounts.total} 張 · 顯示 ${visibilityCounts.visible} · 隱藏 ${visibilityCounts.hidden}`
+                  : `篩選 ${filteredPhotos.length} 張 · 共 ${visibilityCounts.total} 張`}
             </p>
           </div>
           <div className="flex items-center gap-3 shrink-0">
@@ -385,11 +412,47 @@ export default function Admin() {
           </button>
         </section>
 
+        {!loading && photos.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 font-ui">
+            <span className="text-xs text-muted mr-1">相簿顯示</span>
+            {(
+              [
+                ["all", `全部 (${visibilityCounts.total})`],
+                ["visible", `顯示 (${visibilityCounts.visible})`],
+                ["hidden", `隱藏 (${visibilityCounts.hidden})`],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setVisibilityFilter(value)}
+                className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                  visibilityFilter === value
+                    ? "border-accent bg-accent/10 text-text"
+                    : "border-border text-muted hover:border-accent/40 hover:text-text"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {loading ? (
           <p className="text-center text-muted font-ui py-12">載入中…</p>
+        ) : filteredPhotos.length === 0 ? (
+          <p className="rounded-2xl border border-border bg-panel/60 px-6 py-12 text-center text-sm font-ui text-muted">
+            {photos.length === 0
+              ? "尚無照片"
+              : visibilityFilter === "hidden"
+                ? "沒有隱藏的相片"
+                : visibilityFilter === "visible"
+                  ? "沒有顯示中的相片"
+                  : "沒有符合條件的相片"}
+          </p>
         ) : (
           <div className="columns-1 gap-4 sm:columns-2 lg:columns-3">
-            {photos.map((photo) => (
+            {filteredPhotos.map((photo) => (
               <article
                 key={photo.id}
                 className={`mb-4 break-inside-avoid rounded-2xl border bg-panel overflow-hidden shadow-sm ${
