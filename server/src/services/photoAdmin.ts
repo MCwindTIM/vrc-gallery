@@ -90,6 +90,7 @@ export interface PhotoUpdateInput {
   date?: string;
   annotation?: PhotoAnnotation;
   displayOrientation?: PhotoRecord["displayOrientation"] | "auto" | null;
+  hidden?: boolean;
 }
 
 export async function updatePhoto(
@@ -163,8 +164,15 @@ export async function updatePhoto(
     }
   }
 
-  const photos = [...catalog.photos];
-  photos[index] = updated;
+  if (input.hidden !== undefined) {
+    if (input.hidden) {
+      updated.hidden = true;
+    } else {
+      delete updated.hidden;
+    }
+  }
+
+  const photos = catalog.photos.map((p) => (p.id === id ? updated : p));
   await saveCatalog(photos);
   return updated;
 }

@@ -51,6 +51,10 @@ function mergeExistingRecord(
     merged.annotation = existing.annotation;
   }
 
+  if (existing.hidden) {
+    merged.hidden = true;
+  }
+
   return merged;
 }
 

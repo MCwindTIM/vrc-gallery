@@ -110,7 +110,7 @@ adminRouter.post("/photos", upload.array("files", 10), async (req, res, next) =>
 
 adminRouter.patch("/photos/:id", async (req, res, next) => {
   try {
-    const { name, date, annotation, displayOrientation } = req.body ?? {};
+    const { name, date, annotation, displayOrientation, hidden } = req.body ?? {};
     const photo = await updatePhoto(req.params.id, {
       name: typeof name === "string" ? name : undefined,
       date: typeof date === "string" ? date : undefined,
@@ -123,6 +123,7 @@ adminRouter.patch("/photos/:id", async (req, res, next) => {
         displayOrientation === null
           ? displayOrientation
           : undefined,
+      hidden: typeof hidden === "boolean" ? hidden : undefined,
     });
     res.json({ photo });
   } catch (err) {

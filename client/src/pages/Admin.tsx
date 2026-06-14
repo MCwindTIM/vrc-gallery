@@ -32,6 +32,7 @@ interface EditForm {
   name: string;
   date: string;
   displayOrientation: PhotoDisplayOrientation;
+  hidden: boolean;
   world: string;
   author: string;
   description: string;
@@ -43,6 +44,7 @@ function photoToForm(photo: Photo): EditForm {
     name: photo.name,
     date: toDatetimeLocal(photo.date),
     displayOrientation: photo.displayOrientation ?? "auto",
+    hidden: photo.hidden ?? false,
     world: photo.annotation?.world ?? "",
     author: photo.annotation?.author ?? "",
     description: photo.annotation?.description ?? "",
@@ -61,6 +63,7 @@ function formToPayload(form: EditForm) {
     name: form.name.trim(),
     date: new Date(form.date).toISOString(),
     displayOrientation: form.displayOrientation,
+    hidden: form.hidden,
     annotation,
   };
 }
@@ -202,10 +205,9 @@ export default function Admin() {
     setSaving(true);
     setError(null);
     try {
-      const updated = await updatePhoto(editing.id, formToPayload(editForm));
-      setPhotos((prev) =>
-        prev.map((p) => (p.id === editing.id ? updated : p))
-      );
+      await updatePhoto(editing.id, formToPayload(editForm));
+      const data = await fetchAdminPhotos();
+      setPhotos(data.photos);
       flash("已儲存");
       closeEdit();
     } catch (err) {
@@ -390,16 +392,26 @@ export default function Admin() {
             {photos.map((photo) => (
               <article
                 key={photo.id}
-                className="mb-4 break-inside-avoid rounded-2xl border border-border bg-panel overflow-hidden shadow-sm"
+                className={`mb-4 break-inside-avoid rounded-2xl border bg-panel overflow-hidden shadow-sm ${
+                  photo.hidden
+                    ? "border-dashed border-muted/50 opacity-75"
+                    : "border-border"
+                }`}
               >
-                <div className="bg-surface overflow-hidden">
+                <div className="relative bg-surface overflow-hidden">
                   <PhotoThumb photo={photo} />
+                  {photo.hidden && (
+                    <span className="absolute right-2 top-2 rounded-md bg-void/90 px-2 py-0.5 text-xs font-ui text-muted shadow-sm">
+                      已隱藏
+                    </span>
+                  )}
                 </div>
                 <div className="p-4 space-y-2">
                   <h2 className="font-ui font-medium text-text truncate" title={photo.name}>
                     {photo.name}
                   </h2>
                   <p className="text-xs font-ui text-muted">
+                    {photo.hidden ? "隱藏 · " : "顯示 · "}
                     {photoDisplayOrientationLabel(
                       photo.width,
                       photo.height,
@@ -500,6 +512,37 @@ export default function Admin() {
                             ...editForm,
                             displayOrientation: value,
                           })
+                        }
+                        className="sr-only"
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <fieldset className="block">
+                <legend className="text-muted text-xs">相簿顯示</legend>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(
+                    [
+                      [false, "顯示於相簿"],
+                      [true, "隱藏"],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <label
+                      key={label}
+                      className={`cursor-pointer rounded-lg border px-3 py-2 text-sm transition ${
+                        editForm.hidden === value
+                          ? "border-accent bg-accent/10 text-text"
+                          : "border-border text-muted hover:border-accent/40"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="galleryVisibility"
+                        checked={editForm.hidden === value}
+                        onChange={() =>
+                          setEditForm({ ...editForm, hidden: value })
                         }
                         className="sr-only"
                       />

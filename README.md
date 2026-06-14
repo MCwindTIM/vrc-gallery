@@ -8,8 +8,8 @@ Full-stack photo gallery for [vrc.mcwind.cloud](https://vrc.mcwind.cloud) — br
 - **Month filter** — year-grouped dropdown; custom styled panel on desktop (`sm+`), native `<select>` on mobile; filter syncs to `?month=YYYY-MM` (shareable URLs, browser back/forward); subtitle shows filtered count (e.g. `12 張照片 · 2024年3月`)
 - **Lightbox** — prev/next scoped to the active month filter (including cross-page neighbors via API); swipe/drag horizontally to change photos; keyboard ← → / Esc / R (rotate); load progress for large images with browser-cache awareness
 - **VRChat metadata** — capture date from XMP `CreateDate` or `VRChat_YYYY-MM-DD_…` filenames; optional annotations (world, author, description, in-game comment) from embedded XMP
-- **Admin panel** (`/admin`, internal network only) — upload (drag-and-drop, up to 10 files), edit metadata, rename, delete, set per-photo **display orientation** (auto / portrait / landscape); masonry card layout; optional password login with signed HttpOnly session cookie (see `ADMIN_PASSWORD`)
-- **Catalog sync** — CLI scans `photos/`, generates WebP thumbnails, writes `data/photos.json`; non-image files (e.g. `photos.json`, `thumbs/`) are skipped automatically; catalog reloads when the file changes on disk; **preserves admin-edited** `displayOrientation`, `date`, and `annotation` on re-sync
+- **Admin panel** (`/admin`, internal network only) — upload (drag-and-drop, up to 10 files), edit metadata, rename, delete, set per-photo **display orientation** (auto / portrait / landscape), **hide from public gallery**; masonry card layout; optional password login with signed HttpOnly session cookie (see `ADMIN_PASSWORD`)
+- **Catalog sync** — CLI scans `photos/`, generates WebP thumbnails, writes `data/photos.json`; non-image files (e.g. `photos.json`, `thumbs/`) are skipped automatically; catalog reloads when the file changes on disk; **preserves admin-edited** `displayOrientation`, `hidden`, `date`, and `annotation` on re-sync
 - **Backward compatible** — `GET /photos.json` serves the legacy flat catalog format
 
 ### Gallery URL
@@ -79,7 +79,7 @@ A single Node process on `PORT` (default `8787`) serves the SPA, `/api`, and `/p
 | `npm run sync-photos` | Dev / manual | Scan `photos/` via `tsx` (no build needed) |
 | `npm run sync-photos:prod` | After build | Scan `photos/` via compiled `server/dist/scripts/sync-photos.js` |
 
-`npm start` runs `sync-photos:prod` first (via `prestart`), so thumbnails and `data/photos.json` stay in sync on every restart. Re-sync refreshes file metadata (dimensions, XMP) but **keeps** admin overrides already stored in `photos.json` (`displayOrientation`, edited `date`, edited `annotation`). After adding images while the server is already running, run `npm run sync-photos:prod` — the API reloads the catalog when `photos.json` changes on disk.
+`npm start` runs `sync-photos:prod` first (via `prestart`), so thumbnails and `data/photos.json` stay in sync on every restart. Re-sync refreshes file metadata (dimensions, XMP) but **keeps** admin overrides already stored in `photos.json` (`displayOrientation`, `hidden`, edited `date`, edited `annotation`). After adding images while the server is already running, run `npm run sync-photos:prod` — the API reloads the catalog when `photos.json` changes on disk.
 
 ### First deploy
 
@@ -214,6 +214,15 @@ Sync and catalog load **skip** non-image files and directories in `photos/` (e.g
 
 Set in admin **編輯 → 顯示方向**. Lightbox still supports extra rotation with **R**. Orientation overrides survive `sync-photos` / server restarts.
 
+**Gallery visibility** (optional, admin-editable, stored as `hidden: true`):
+
+| Value | Behavior |
+|-------|----------|
+| *(omit / show)* | Photo appears in public gallery, stats, and month filter |
+| `hidden: true` | Excluded from public gallery and stats; still visible in admin and via direct `/photos/…` URL |
+
+Set in admin **編輯 → 相簿顯示**. Hidden state survives `sync-photos` / server restarts.
+
 **Dates & time display**
 
 - Stored `date` values are ISO UTC strings from XMP / filename / filesystem at sync time
@@ -265,7 +274,7 @@ From a private-network IP:
 | `GET` | `/api/admin/access` | Check admin access |
 | `GET` | `/api/admin/photos` | Full catalog (with IDs) |
 | `POST` | `/api/admin/photos` | Upload images (`multipart/form-data`, field `files`, max 10 × 50 MB); non-image files in the batch are skipped |
-| `PATCH` | `/api/admin/photos/:id` | Update `name`, `date`, `annotation`, `displayOrientation` (`auto` \| `portrait` \| `landscape`) |
+| `PATCH` | `/api/admin/photos/:id` | Update `name`, `date`, `annotation`, `displayOrientation`, `hidden` |
 | `DELETE` | `/api/admin/photos/:id` | Remove image, thumbnail, and catalog entry |
 
 Behind a reverse proxy, set `TRUST_PROXY=1` and forward the client IP:

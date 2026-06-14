@@ -54,6 +54,10 @@ export async function loadCatalog(force = false): Promise<PhotoCatalog> {
   return cache;
 }
 
+export function visiblePhotos(photos: PhotoRecord[]): PhotoRecord[] {
+  return photos.filter((p) => !p.hidden);
+}
+
 export function filterPhotos(
   photos: PhotoRecord[],
   query: PhotosQuery

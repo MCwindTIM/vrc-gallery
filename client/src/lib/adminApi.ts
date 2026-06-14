@@ -118,6 +118,7 @@ export async function updatePhoto(
     date?: string;
     annotation?: PhotoAnnotation;
     displayOrientation?: "auto" | "portrait" | "landscape" | null;
+    hidden?: boolean;
   }
 ): Promise<Photo> {
   const res = await adminFetch(`/photos/${encodeURIComponent(id)}`, {

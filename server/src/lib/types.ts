@@ -17,6 +17,8 @@ export interface PhotoRecord {
   height: number;
   year: number;
   displayOrientation?: PhotoDisplayOrientation;
+  /** When true, excluded from public gallery and stats. */
+  hidden?: boolean;
   annotation?: PhotoAnnotation;
 }
 

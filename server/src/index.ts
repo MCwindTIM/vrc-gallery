@@ -6,7 +6,7 @@ import cors from "cors";
 import { photosRouter } from "./routes/photos.js";
 import { adminRouter } from "./routes/admin.js";
 import { requirePrivateNetwork } from "./middleware/privateNetwork.js";
-import { loadCatalog } from "./services/photoCatalog.js";
+import { loadCatalog, visiblePhotos } from "./services/photoCatalog.js";
 import { CLIENT_DIST, PHOTOS_DIR, CATALOG_PATH } from "./lib/paths.js";
 import { warnIfAdminAuthMisconfigured } from "./lib/adminAuth.js";
 
@@ -39,7 +39,7 @@ app.use("/api/admin", adminRouter);
 app.get("/photos.json", async (_req, res, next) => {
   try {
     const { photos } = await loadCatalog();
-    const legacy = photos.map(({ id, year, ...p }) => p);
+    const legacy = visiblePhotos(photos).map(({ id, year, hidden, ...p }) => p);
     res.json(legacy);
   } catch (err) {
     next(err);

@@ -16,6 +16,8 @@ export interface Photo {
   year: number;
   /** Override gallery/lightbox layout: portrait or landscape. Omit for auto from pixels. */
   displayOrientation?: "portrait" | "landscape";
+  /** When true, hidden from public gallery (admin only). */
+  hidden?: boolean;
   annotation?: PhotoAnnotation;
 }
 
