@@ -1,20 +1,22 @@
 # 土豆 VRChat Gallery
 
-VRChat 相片相簿 — [vrc.mcwind.cloud](https://vrc.mcwind.cloud)
+VRChat photo gallery — [vrc.mcwind.cloud](https://vrc.mcwind.cloud)
 
-npm workspaces monorepo（React + Express）。公開相簿含月份篩選、燈箱、VRChat 元數據；內網 `/admin` 管理上傳、編輯、顯示方向、顯示/隱藏。
+**Languages:** [繁體中文](README.zh-TW.md) · [简体中文](README.zh-CN.md)
+
+npm workspaces monorepo (React + Express). Public gallery with month filter, lightbox, and VRChat metadata. Internal `/admin` for upload, edit, orientation, and show/hide.
 
 ## Features
 
-- **Gallery** — 瀑布流、無限捲動、月份篩選（`?month=YYYY-MM`）、燈箱（← → Esc / R 旋轉）
-- **Metadata** — XMP 拍攝時間、世界、作者、備註；日期分組用 `Asia/Taipei`，24 小時制
-- **Admin** — 拖放上傳、編輯、重新命名、刪除；顯示方向；相簿顯示/隱藏；可見性過濾器
-- **Sync** — 掃描 `photos/` 產生 WebP 縮圖與 `photos.json`；略過非圖片檔
+- **Gallery** — masonry grid, infinite scroll, month filter (`?month=YYYY-MM`), lightbox (← → Esc / R rotate)
+- **Metadata** — XMP capture time, world, author, notes; `Asia/Taipei` grouping, 24-hour timestamps
+- **Admin** — drag-and-drop upload, edit, rename, delete; display orientation; gallery visibility filter
+- **Sync** — scans `photos/`, WebP thumbnails, `photos.json`; skips non-images
 
 ## Stack
 
 React 19 · Vite 6 · Tailwind 4 · Express 5 · Sharp · Multer  
-字體：Klee One（手寫）、Noto Sans TC/SC（UI）、LXGW WenKai Lite（混合簡繁名稱）
+Fonts: Klee One, Noto Sans TC/SC, LXGW WenKai Lite (mixed CJK names)
 
 ## Project structure
 
@@ -22,8 +24,8 @@ React 19 · Vite 6 · Tailwind 4 · Express 5 · Sharp · Multer
 vrc-gallery/
 ├── client/              → client/dist/
 ├── server/              → server/dist/
-├── photos/              # 原圖 + thumbs/（gitignore）
-├── data/photos.json     # 目錄索引（gitignore）
+├── photos/              # originals + thumbs/ (gitignored)
+├── data/photos.json     # catalog (gitignored)
 ├── scripts/             # deploy.sh, prod.sh, docker-import.sh
 ├── Dockerfile
 ├── docker-compose.yml
@@ -33,58 +35,56 @@ vrc-gallery/
 
 ## Quick start
 
-**Dev**（不需 build）：
+**Dev** (no build):
 
 ```bash
 npm install && cp .env.example .env
 mkdir -p photos data && npm run sync-photos
-npm run dev          # :5173（proxy） + API :8787
+npm run dev          # :5173 (proxy) + API :8787
 ```
 
-**Production**：
+**Production**:
 
 ```bash
 npm ci && cp .env.example .env && mkdir -p photos data
-npm run build && npm start    # prestart 會跑 sync-photos:prod
+npm run build && npm start    # prestart runs sync-photos:prod
 ```
 
-或 `./scripts/deploy.sh` → `./scripts/prod.sh`（會載入 `.env`）。
+Or `./scripts/deploy.sh` → `./scripts/prod.sh` (loads `.env`).
 
-**Update**：
+**Update**:
 
 ```bash
 git pull && npm ci && npm run build && pm2 restart vrc-gallery
 ```
 
-> `.env` 不會自動載入。直接 `npm start` 請先 `export` 或用 `prod.sh` / PM2 `env`。
+> `.env` is not loaded automatically — use `prod.sh`, PM2 `env`, or export before `npm start`.
 
 ## Scripts
 
-| Script | 用途 |
-|--------|------|
+| Script | Purpose |
+|--------|---------|
 | `npm run dev` | Vite + tsx |
 | `npm run build` | client + server |
 | `npm run prod` | build + start |
-| `npm start` | sync-photos:prod → 啟動 API（含 SPA） |
-| `npm run sync-photos` | 掃描 photos/（dev，tsx） |
-| `npm run sync-photos:prod` | 掃描 photos/（built） |
+| `npm start` | sync-photos:prod → serve SPA + API |
+| `npm run sync-photos` | scan photos/ (dev) |
+| `npm run sync-photos:prod` | scan photos/ (built) |
 
 ## Photo catalog
 
-1. 放入 `photos/`（`.jpg` `.jpeg` `.png` `.webp`）
-2. `npm run sync-photos` → 寫入 `photos/thumbs/{id}_thumb.webp` 與 `data/photos.json`
+1. Add images to `photos/` (`.jpg` `.jpeg` `.png` `.webp`)
+2. `npm run sync-photos` → `photos/thumbs/{id}_thumb.webp` + `data/photos.json`
 
-**拍攝日期優先順序：** XMP CreateDate → VRChat 檔名 → 檔案建立時間
+**Capture date:** XMP CreateDate → VRChat filename → file birth time
 
-**Re-sync 會保留 admin 修改：** `hidden`、`displayOrientation`、`date`、`annotation`  
-執行中新增圖片：手動 `npm run sync-photos:prod`（API 會偵測 `photos.json` 變更）
+**Re-sync preserves admin edits:** `hidden`, `displayOrientation`, `date`, `annotation`  
+While running, add files then run `npm run sync-photos:prod` (API reloads on catalog change)
 
-**Catalog 欄位（admin 可改）：**
-
-| 欄位 | 說明 |
-|------|------|
-| `displayOrientation` | `portrait` / `landscape`；省略＝依像素自動 |
-| `hidden` | `true`＝公開相簿與統計隱藏；admin 仍可見 |
+| Field | Description |
+|-------|-------------|
+| `displayOrientation` | `portrait` / `landscape`; omit = auto from pixels |
+| `hidden` | `true` = hidden from public gallery/stats; still in admin |
 
 ## Deploy
 
@@ -101,17 +101,17 @@ mkdir -p photos data
 docker compose up -d --build
 ```
 
-**Volume 必須分開**（不可同一 volume 掛兩個 path）：
+**Use two separate volumes** (never mount one volume to both paths):
 
-| 容器路徑 | 內容 |
-|----------|------|
-| `/app/photos` | 原圖 + `thumbs/` |
+| Container path | Contents |
+|----------------|----------|
+| `/app/photos` | images + `thumbs/` |
 | `/app/data` | `photos.json` |
 
-匯入映像：`docker load -i vrc-gallery-image.tar && ./scripts/docker-import.sh`  
-Portainer 後方有 proxy 時設 `TRUST_PROXY=1`。
+Import image: `docker load -i vrc-gallery-image.tar && ./scripts/docker-import.sh`  
+Behind a proxy in Portainer: set `TRUST_PROXY=1`.
 
-### Reverse proxy（nginx 摘要）
+### Reverse proxy (nginx)
 
 ```nginx
 proxy_pass http://127.0.0.1:8787;
@@ -122,62 +122,60 @@ proxy_set_header X-Forwarded-Proto $scheme;
 
 ## Environment
 
-| Variable | Default | 說明 |
-|----------|---------|------|
-| `PORT` | `8787` | 監聽埠 |
-| `PHOTOS_DIR` | `./photos` | 原圖目錄 |
-| `DATA_DIR` | `./data` | catalog 目錄 |
-| `PHOTO_TZ` | `Asia/Taipei` | 日期/月份分組 |
-| `PHOTO_TZ_OFFSET` | `+08:00` | VRChat 檔名無 TZ 時的偏移 |
-| `NODE_ENV` | — | `production` 隱藏 API 錯誤細節 |
-| `CORS_ORIGIN` | reflect | 正式環境建議明確設定 |
-| `TRUST_PROXY` | — | 有 nginx/Caddy 設 `1`；直連 LAN HTTP 設 `0` |
-| `ADMIN_PASSWORD` | — | 後台密碼（內網 IP + 登入） |
-| `ADMIN_JWT_SECRET` | 衍生 | session cookie 簽名 |
-| `ADMIN_SESSION_HOURS` | `24` | session 時效 |
-| `ADMIN_COOKIE_SECURE` | auto | HTTPS 自動 Secure；LAN HTTP 設 `0` |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `8787` | listen port |
+| `PHOTOS_DIR` | `./photos` | image directory |
+| `DATA_DIR` | `./data` | catalog directory |
+| `PHOTO_TZ` | `Asia/Taipei` | day/month grouping |
+| `PHOTO_TZ_OFFSET` | `+08:00` | VRChat filename TZ fallback |
+| `NODE_ENV` | — | `production` hides API error details |
+| `CORS_ORIGIN` | reflect | set explicitly in production |
+| `TRUST_PROXY` | — | `1` behind nginx/Caddy; `0` for direct LAN HTTP |
+| `ADMIN_PASSWORD` | — | admin login (private IP + password) |
+| `ADMIN_JWT_SECRET` | derived | session cookie HMAC secret |
+| `ADMIN_SESSION_HOURS` | `24` | session lifetime |
+| `ADMIN_COOKIE_SECURE` | auto | Secure on HTTPS; `0` for `http://192.168.x.x` |
 
-Dev only：`VITE_API_PROXY` / `VITE_PHOTO_PROXY`（預設 `http://127.0.0.1:8787`）
+Dev only: `VITE_API_PROXY` / `VITE_PHOTO_PROXY` (default `http://127.0.0.1:8787`)
 
 ## Admin
 
-| 來源 | `/admin` | `/api/admin/*` |
-|------|----------|----------------|
-| 內網 IP | 登入頁（可設密碼） | 需 session cookie |
-| 外網 | 302 → `/` | 302 → `/` |
+| Client | `/admin` | `/api/admin/*` |
+|--------|----------|----------------|
+| Private IP | login UI | session cookie required |
+| Public IP | 302 → `/` | 302 → `/` |
 
-**功能：** 上傳 · 編輯 metadata · 重新命名 · 刪除 · 顯示方向 · 相簿顯示/隱藏 · 過濾（全部/顯示/隱藏）
+**Features:** upload · edit metadata · rename · delete · orientation · show/hide · visibility filter
 
-**Admin API**（內網 + cookie）：
-
-| Method | Path | 說明 |
-|--------|------|------|
-| `GET` | `/api/admin/access` | 存取狀態（含 `clientIp`） |
-| `POST` | `/api/admin/login` | 登入 |
-| `POST` | `/api/admin/logout` | 登出 |
-| `GET` | `/api/admin/photos` | 完整 catalog |
-| `POST` | `/api/admin/photos` | 上傳（`files`，最多 10 × 50MB） |
-| `PATCH` | `/api/admin/photos/:id` | 更新 name / date / annotation / displayOrientation / hidden |
-| `DELETE` | `/api/admin/photos/:id` | 刪除 |
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/access` | access status (`clientIp`, etc.) |
+| `POST` | `/api/admin/login` | login |
+| `POST` | `/api/admin/logout` | logout |
+| `GET` | `/api/admin/photos` | full catalog |
+| `POST` | `/api/admin/photos` | upload (`files`, max 10 × 50MB) |
+| `PATCH` | `/api/admin/photos/:id` | update fields incl. `hidden` |
+| `DELETE` | `/api/admin/photos/:id` | delete |
 
 ## Public API
 
-| Method | Path | 說明 |
-|--------|------|------|
-| `GET` | `/api/health` | 健康檢查 |
-| `GET` | `/api/photos/stats` | 總數、月份統計（不含 hidden） |
-| `GET` | `/api/photos` | 分頁：`page` `limit` `month` `year` `q` |
-| `GET` | `/api/photos/:id` | 單張 + prev/next（filter 需與列表一致） |
-| `GET` | `/photos.json` | 舊版 flat catalog |
-| `GET` | `/photos/*` | 靜態圖片 |
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/health` | health check |
+| `GET` | `/api/photos/stats` | totals, months (excludes hidden) |
+| `GET` | `/api/photos` | paginated: `page` `limit` `month` `year` `q` |
+| `GET` | `/api/photos/:id` | detail + prev/next |
+| `GET` | `/photos.json` | legacy flat catalog |
+| `GET` | `/photos/*` | static files |
 
 ## Troubleshooting
 
-| 問題 | 處理 |
-|------|------|
-| 內網 `/admin` 被 redirect | `TRUST_PROXY=0`；查 `/api/admin/access` 的 `clientIp` |
-| 登入成功但 API 401 | LAN HTTP 時 cookie 勿用 `Secure` → `ADMIN_COOKIE_SECURE=0` 或確保非 HTTPS 自動加 Secure |
-| admin 設定重啟後消失 | 需新版 server；`sync-photos` 會保留 `hidden` 等欄位 |
-| 設定沒生效 | `npm run build` 後重啟；client + server 都要更新 |
-| Docker 目錄混亂 | `photos` 與 `data` 分開 volume |
-| 簡體字顯示不一致 | UI 用 Noto SC fallback；名稱用 LXGW WenKai Lite |
+| Issue | Fix |
+|-------|-----|
+| LAN `/admin` redirects to `/` | `TRUST_PROXY=0`; check `/api/admin/access` → `clientIp` |
+| Login OK but API 401 | no `Secure` cookie on HTTP LAN → `ADMIN_COOKIE_SECURE=0` |
+| Admin settings lost on restart | update server; sync preserves `hidden`, etc. |
+| Changes not applied | `npm run build` + restart both client and server |
+| Docker messy dirs | separate `photos` and `data` volumes |
+| Mixed simplified glyphs | Noto SC fallback; names use LXGW WenKai Lite |
