@@ -1,320 +1,183 @@
 # 土豆 VRChat Gallery
 
-Full-stack photo gallery for [vrc.mcwind.cloud](https://vrc.mcwind.cloud) — browse VRChat screenshots with capture metadata, month filters, infinite scroll, and an internal admin panel for uploads and edits.
+VRChat 相片相簿 — [vrc.mcwind.cloud](https://vrc.mcwind.cloud)
+
+npm workspaces monorepo（React + Express）。公開相簿含月份篩選、燈箱、VRChat 元數據；內網 `/admin` 管理上傳、編輯、顯示方向、顯示/隱藏。
 
 ## Features
 
-- **Gallery** — paginated masonry-style grid with infinite scroll, month filter, and lightbox; day/month grouping uses `Asia/Taipei` (+08:00), timestamps shown in 24-hour format (e.g. `2026/06/11 00:38`)
-- **Month filter** — year-grouped dropdown; custom styled panel on desktop (`sm+`), native `<select>` on mobile; filter syncs to `?month=YYYY-MM` (shareable URLs, browser back/forward); subtitle shows filtered count (e.g. `12 張照片 · 2024年3月`)
-- **Lightbox** — prev/next scoped to the active month filter (including cross-page neighbors via API); swipe/drag horizontally to change photos; keyboard ← → / Esc / R (rotate); load progress for large images with browser-cache awareness
-- **VRChat metadata** — capture date from XMP `CreateDate` or `VRChat_YYYY-MM-DD_…` filenames; optional annotations (world, author, description, in-game comment) from embedded XMP
-- **Admin panel** (`/admin`, internal network only) — upload (drag-and-drop, up to 10 files), edit metadata, rename, delete, set per-photo **display orientation** (auto / portrait / landscape), **hide from public gallery**; masonry card layout; optional password login with signed HttpOnly session cookie (see `ADMIN_PASSWORD`)
-- **Catalog sync** — CLI scans `photos/`, generates WebP thumbnails, writes `data/photos.json`; non-image files (e.g. `photos.json`, `thumbs/`) are skipped automatically; catalog reloads when the file changes on disk; **preserves admin-edited** `displayOrientation`, `hidden`, `date`, and `annotation` on re-sync
-- **Backward compatible** — `GET /photos.json` serves the legacy flat catalog format
-
-### Gallery URL
-
-- `?month=YYYY-MM` — deep-link or share a month filter (e.g. `/?month=2024-03`)
-- Omit the param to show all photos; invalid values are ignored
-- Browser back/forward restores the previous filter
-
-## Project structure
-
-npm workspaces monorepo:
-
-```
-vrc-gallery/
-├── client/          # React SPA (Vite) → client/dist/ after build
-├── server/          # Express API → server/dist/ after build
-├── scripts/         # deploy.sh, prod.sh, docker-import.sh
-├── photos/          # Full-size images + thumbs/ (gitignored)
-├── data/            # photos.json catalog (gitignored)
-├── Dockerfile
-├── docker-compose.yml
-├── ecosystem.config.cjs
-├── .env.example
-└── package.json
-```
+- **Gallery** — 瀑布流、無限捲動、月份篩選（`?month=YYYY-MM`）、燈箱（← → Esc / R 旋轉）
+- **Metadata** — XMP 拍攝時間、世界、作者、備註；日期分組用 `Asia/Taipei`，24 小時制
+- **Admin** — 拖放上傳、編輯、重新命名、刪除；顯示方向；相簿顯示/隱藏；可見性過濾器
+- **Sync** — 掃描 `photos/` 產生 WebP 縮圖與 `photos.json`；略過非圖片檔
 
 ## Stack
 
-- **Client:** React 19, Vite 6, Tailwind CSS 4, Framer Motion; fonts via Google Fonts CDN (`fonts.loli.net` / `fonts.googleapis.com`) — `Klee One` for handwritten body; `LXGW WenKai Lite` for mixed-script display names; `Noto Sans TC` + `Noto Sans SC` for UI / photo titles
-- **Server:** Express 5, TypeScript, Sharp (thumbnails + metadata), Multer (uploads)
+React 19 · Vite 6 · Tailwind 4 · Express 5 · Sharp · Multer  
+字體：Klee One（手寫）、Noto Sans TC/SC（UI）、LXGW WenKai Lite（混合簡繁名稱）
 
-## Development
+## Project structure
 
-Dev mode does **not** require `npm run build`. Vite serves the client on the fly; the server runs TypeScript via `tsx`.
-
-```bash
-cd vrc-gallery
-npm install
-cp .env.example .env   # optional; defaults work for local dev
-mkdir -p photos data
-npm run sync-photos    # create data/photos.json (empty [] if no images yet)
-npm run dev
+```
+vrc-gallery/
+├── client/              → client/dist/
+├── server/              → server/dist/
+├── photos/              # 原圖 + thumbs/（gitignore）
+├── data/photos.json     # 目錄索引（gitignore）
+├── scripts/             # deploy.sh, prod.sh, docker-import.sh
+├── Dockerfile
+├── docker-compose.yml
+├── ecosystem.config.cjs
+└── .env.example
 ```
 
-- Frontend: http://localhost:5173 (proxies `/api`, `/photos`, and `/photos.json` to the API)
-- API: http://localhost:8787
+## Quick start
 
-Place images in `photos/` (JPEG, PNG, or WebP), then run `npm run sync-photos` again to refresh the catalog and thumbnails.
-
-## Production
-
-Production **must** build both workspaces before start:
-
-1. **Client** — `vite build` → `client/dist/` (static SPA)
-2. **Server** — `tsc` → `server/dist/` (Node API + serves `client/dist`)
-
-A single Node process on `PORT` (default `8787`) serves the SPA, `/api`, and `/photos`.
-
-### npm scripts
-
-| Script | When | What it does |
-|--------|------|----------------|
-| `npm run dev` | Local dev | Vite `:5173` + `tsx` API `:8787` — **no build** |
-| `npm run build` | Deploy | `vite build` + `tsc` |
-| `npm run prod` | Deploy | `build` then `start` (one-shot) |
-| `npm start` | After build | `sync-photos:prod` then `node server/dist/index.js` |
-| `npm run sync-photos` | Dev / manual | Scan `photos/` via `tsx` (no build needed) |
-| `npm run sync-photos:prod` | After build | Scan `photos/` via compiled `server/dist/scripts/sync-photos.js` |
-
-`npm start` runs `sync-photos:prod` first (via `prestart`), so thumbnails and `data/photos.json` stay in sync on every restart. Re-sync refreshes file metadata (dimensions, XMP) but **keeps** admin overrides already stored in `photos.json` (`displayOrientation`, `hidden`, edited `date`, edited `annotation`). After adding images while the server is already running, run `npm run sync-photos:prod` — the API reloads the catalog when `photos.json` changes on disk.
-
-### First deploy
+**Dev**（不需 build）：
 
 ```bash
-cd vrc-gallery
-./scripts/deploy.sh      # npm ci, .env, mkdir, build, sync-photos:prod
-./scripts/prod.sh        # load .env, npm start
+npm install && cp .env.example .env
+mkdir -p photos data && npm run sync-photos
+npm run dev          # :5173（proxy） + API :8787
 ```
 
-Or step by step:
+**Production**：
 
 ```bash
-npm ci
-cp .env.example .env     # set TRUST_PROXY, NODE_ENV, CORS_ORIGIN, etc.
-mkdir -p photos data
-# copy or rsync existing photos/ and data/photos.json if migrating
-npm run prod             # build + start
+npm ci && cp .env.example .env && mkdir -p photos data
+npm run build && npm start    # prestart 會跑 sync-photos:prod
 ```
 
-App listens on http://localhost:8787 (or your `PORT`). Put nginx/Caddy in front for HTTPS.
+或 `./scripts/deploy.sh` → `./scripts/prod.sh`（會載入 `.env`）。
+
+**Update**：
+
+```bash
+git pull && npm ci && npm run build && pm2 restart vrc-gallery
+```
+
+> `.env` 不會自動載入。直接 `npm start` 請先 `export` 或用 `prod.sh` / PM2 `env`。
+
+## Scripts
+
+| Script | 用途 |
+|--------|------|
+| `npm run dev` | Vite + tsx |
+| `npm run build` | client + server |
+| `npm run prod` | build + start |
+| `npm start` | sync-photos:prod → 啟動 API（含 SPA） |
+| `npm run sync-photos` | 掃描 photos/（dev，tsx） |
+| `npm run sync-photos:prod` | 掃描 photos/（built） |
+
+## Photo catalog
+
+1. 放入 `photos/`（`.jpg` `.jpeg` `.png` `.webp`）
+2. `npm run sync-photos` → 寫入 `photos/thumbs/{id}_thumb.webp` 與 `data/photos.json`
+
+**拍攝日期優先順序：** XMP CreateDate → VRChat 檔名 → 檔案建立時間
+
+**Re-sync 會保留 admin 修改：** `hidden`、`displayOrientation`、`date`、`annotation`  
+執行中新增圖片：手動 `npm run sync-photos:prod`（API 會偵測 `photos.json` 變更）
+
+**Catalog 欄位（admin 可改）：**
+
+| 欄位 | 說明 |
+|------|------|
+| `displayOrientation` | `portrait` / `landscape`；省略＝依像素自動 |
+| `hidden` | `true`＝公開相簿與統計隱藏；admin 仍可見 |
+
+## Deploy
 
 ### PM2
 
 ```bash
-npm run build
-pm2 start ecosystem.config.cjs
+npm run build && pm2 start ecosystem.config.cjs
 ```
 
-Customize env in `ecosystem.config.cjs` or override at runtime. PM2 runs `npm start`, so catalog sync runs on each (re)start.
-
 ### Docker
-
-Build and run with Docker Compose:
 
 ```bash
 mkdir -p photos data
 docker compose up -d --build
 ```
 
-App listens on http://localhost:8787. `npm start` inside the container runs `sync-photos:prod` on each start.
+**Volume 必須分開**（不可同一 volume 掛兩個 path）：
 
-**Import a pre-built image** (e.g. on another machine or Portainer):
+| 容器路徑 | 內容 |
+|----------|------|
+| `/app/photos` | 原圖 + `thumbs/` |
+| `/app/data` | `photos.json` |
 
-```bash
-docker load -i vrc-gallery-image.tar
-./scripts/docker-import.sh   # load image + docker compose up -d
-```
+匯入映像：`docker load -i vrc-gallery-image.tar && ./scripts/docker-import.sh`  
+Portainer 後方有 proxy 時設 `TRUST_PROXY=1`。
 
-**Volume mapping** — use **two separate** mounts; do not map the same volume to both paths:
-
-| Host / volume | Container path | Contents |
-|---------------|----------------|----------|
-| `./photos` or `vrc-gallery-photos` | `/app/photos` | Original images + `thumbs/` |
-| `./data` or `vrc-gallery-data` | `/app/data` | `photos.json` only |
-
-Expected layout:
-
-```
-photos/
-  image.png
-  thumbs/
-    image_thumb.webp
-data/
-  photos.json
-```
-
-In Portainer: **Images → Import** to upload `vrc-gallery-image.tar`, then deploy via **Stacks** with `docker-compose.yml`. Set `TRUST_PROXY=1` when behind a reverse proxy.
-
-### Update deploy
-
-```bash
-git pull
-npm ci
-npm run build
-npm run sync-photos:prod   # if photos/ changed on disk
-pm2 restart vrc-gallery     # or ./scripts/prod.sh
-```
-
-> **Note:** The app does not load `.env` automatically. Use `./scripts/prod.sh` (sources `.env`), PM2 `env`, or systemd `EnvironmentFile`. Export vars manually if you run `npm start` directly.
-
-## Environment variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `8787` | Server listen port |
-| `NODE_ENV` | unset | Set to `production` to hide error details in API responses |
-| `DATA_DIR` | `./data` | Directory containing `photos.json` |
-| `CATALOG_PATH` | `{DATA_DIR}/photos.json` | Photo catalog file |
-| `PHOTOS_DIR` | `./photos` | Original images; thumbnails go in `photos/thumbs/` |
-| `PHOTO_TZ_OFFSET` | `+08:00` | Timezone offset for VRChat filename dates (no TZ in filename) |
-| `PHOTO_TZ` | `Asia/Taipei` | IANA timezone for gallery day/month grouping, month filter, and stats (server) |
-| `CORS_ORIGIN` | reflect request origin | Allowed CORS origin (set explicitly in production) |
-| `TRUST_PROXY` | unset | `1` behind a reverse proxy; use `0` for direct HTTP LAN access without a proxy |
-| `ADMIN_PASSWORD` | unset | Admin password; when set, internal clients must log in after passing the IP check |
-| `ADMIN_JWT_SECRET` | derived from password | HMAC secret for admin session cookie (set a dedicated random value in production) |
-| `ADMIN_SESSION_HOURS` | `24` | Admin session lifetime |
-| `ADMIN_COOKIE_SECURE` | auto | `1`/`0` to force; otherwise `Secure` only when the request is HTTPS |
-
-When `TRUST_PROXY` is unset, forwarded headers are still trusted if the direct connection comes from a private IP (typical reverse-proxy setup). For a bare Node process on a home LAN (`http://192.168.x.x:8787`), set `TRUST_PROXY=0` so the real client IP is used for admin access checks.
-
-**Dev-only (Vite):**
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `VITE_API_PROXY` | `http://127.0.0.1:8787` | API proxy target during `npm run dev` |
-| `VITE_PHOTO_PROXY` | same as `VITE_API_PROXY` | `/photos` static proxy target |
-
-## Photo catalog
-
-1. Drop full-size images into `photos/` (supported: `.jpg`, `.jpeg`, `.png`, `.webp`)
-2. Run `npm run sync-photos`
-
-This writes `photos/thumbs/{id}_thumb.webp` (max 640px, WebP quality 82) and updates `data/photos.json`. Re-run sync after upgrading to regenerate WebP thumbnails and refresh catalog paths.
-
-Sync and catalog load **skip** non-image files and directories in `photos/` (e.g. stray `photos.json`, `thumbs/`, other extensions) without failing. Unreadable image files are logged and skipped during sync. Admin upload silently ignores non-image files in a batch.
-
-**Capture date** (in priority order):
-
-1. XMP `CreateDate` or `tiff:DateTime`
-2. `VRChat_YYYY-MM-DD_HH-MM-SS` filename (uses `PHOTO_TZ_OFFSET`)
-3. Filesystem birth time
-
-**Annotations** (optional, from XMP at sync/upload time): `WorldDisplayName`, `xmp:Author`, `dc:description` / `dc:title`, `exif:UserComment`. Shown in the lightbox and editable in admin.
-
-**Display orientation** (optional, admin-editable, stored in `photos.json` as `displayOrientation`):
-
-| Value | Behavior |
-|-------|----------|
-| *(omit / auto)* | Layout follows pixel `width` × `height` |
-| `portrait` | Gallery, lightbox, and admin thumbs treat the photo as vertical; rotates 90° when pixels are landscape |
-| `landscape` | Layout treats the photo as horizontal; rotates 90° when pixels are portrait |
-
-Set in admin **編輯 → 顯示方向**. Lightbox still supports extra rotation with **R**. Orientation overrides survive `sync-photos` / server restarts.
-
-**Gallery visibility** (optional, admin-editable, stored as `hidden: true`):
-
-| Value | Behavior |
-|-------|----------|
-| *(omit / show)* | Photo appears in public gallery, stats, and month filter |
-| `hidden: true` | Excluded from public gallery and stats; still visible in admin and via direct `/photos/…` URL |
-
-Set in admin **編輯 → 相簿顯示**. Hidden state survives `sync-photos` / server restarts.
-
-**Dates & time display**
-
-- Stored `date` values are ISO UTC strings from XMP / filename / filesystem at sync time
-- Gallery day headers, month filter (`?month=YYYY-MM`), and `/api/photos/stats` month counts use **local calendar dates** in `Asia/Taipei` (override server-side with `PHOTO_TZ`)
-- Lightbox and admin list timestamps use **24-hour** format: `YYYY/MM/DD HH:mm` (no 上午/下午)
-- VRChat filename fallback still uses `PHOTO_TZ_OFFSET` when the filename has no timezone
-
-## Admin (internal network only)
-
-- **UI:** `/admin` (lazy-loaded; non-private clients are redirected to `/`)
-- **API:** `/api/admin/*` (same IP restriction; returns `302` redirect to `/` for public IPs)
-- **Dual protection:** private-network IP check **plus** `ADMIN_PASSWORD` session cookie. External visitors are redirected away from `/admin`; internal clients see the login form.
-
-### Access matrix
-
-| Client | `/admin` | `/api/admin/*` |
-|--------|----------|----------------|
-| Private IP (RFC 1918, loopback, link-local) | Login form → password → admin UI | Requires valid session cookie when `ADMIN_PASSWORD` is set |
-| Public IP | `302` redirect to `/` | `302` redirect to `/` |
-
-### Session cookie (`vrc_admin`)
-
-- HttpOnly, `SameSite=Strict`, signed HMAC token
-- **`Secure` flag is set only on HTTPS** (or when `ADMIN_COOKIE_SECURE=1`). Plain HTTP LAN access (e.g. `http://192.168.x.x:8787/admin`) must **not** use `Secure`, or the browser will drop the cookie and login will appear to succeed but subsequent API calls return 401.
-- Force behavior with `ADMIN_COOKIE_SECURE`: `0` = never `Secure`; `1` = always `Secure` (HTTPS only).
-
-### `TRUST_PROXY` for admin IP checks
-
-| Setup | `TRUST_PROXY` | Notes |
-|-------|---------------|-------|
-| Direct LAN access (`http://192.168.x.x:8787`) | `0` or unset | Client IP is the browser's LAN address |
-| Behind nginx/Caddy on HTTPS | `1` | Proxy must send `X-Forwarded-For` / `X-Real-IP` |
-| PM2 on same host, no proxy | `0` | Match `.env`; do not trust forwarded headers |
-
-If admin redirects to `/` from a LAN IP, check `GET /api/admin/access` — response includes `privateNetwork` and `clientIp` for debugging.
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/admin/access` | `{ ok, admin, authRequired, authenticated, privateNetwork, clientIp }` |
-| `POST` | `/api/admin/login` | `{ password }` → sets HttpOnly `vrc_admin` cookie |
-| `POST` | `/api/admin/logout` | Clears admin cookie |
-
-All routes below also require a valid admin session cookie when `ADMIN_PASSWORD` is set:
-
-From a private-network IP:
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/admin/access` | Check admin access |
-| `GET` | `/api/admin/photos` | Full catalog (with IDs) |
-| `POST` | `/api/admin/photos` | Upload images (`multipart/form-data`, field `files`, max 10 × 50 MB); non-image files in the batch are skipped |
-| `PATCH` | `/api/admin/photos/:id` | Update `name`, `date`, `annotation`, `displayOrientation`, `hidden` |
-| `DELETE` | `/api/admin/photos/:id` | Remove image, thumbnail, and catalog entry |
-
-Behind a reverse proxy, set `TRUST_PROXY=1` and forward the client IP:
+### Reverse proxy（nginx 摘要）
 
 ```nginx
-# nginx example
-location / {
-    proxy_pass http://127.0.0.1:8787;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-
-# Optional: block admin from the public internet at the proxy layer
-location ~ ^/(admin|api/admin) {
-    allow 10.0.0.0/8;
-    allow 172.16.0.0/12;
-    allow 192.168.0.0/16;
-    allow 127.0.0.1;
-    deny all;
-    proxy_pass http://127.0.0.1:8787;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
+proxy_pass http://127.0.0.1:8787;
+proxy_set_header X-Real-IP $remote_addr;
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+proxy_set_header X-Forwarded-Proto $scheme;
 ```
+
+## Environment
+
+| Variable | Default | 說明 |
+|----------|---------|------|
+| `PORT` | `8787` | 監聽埠 |
+| `PHOTOS_DIR` | `./photos` | 原圖目錄 |
+| `DATA_DIR` | `./data` | catalog 目錄 |
+| `PHOTO_TZ` | `Asia/Taipei` | 日期/月份分組 |
+| `PHOTO_TZ_OFFSET` | `+08:00` | VRChat 檔名無 TZ 時的偏移 |
+| `NODE_ENV` | — | `production` 隱藏 API 錯誤細節 |
+| `CORS_ORIGIN` | reflect | 正式環境建議明確設定 |
+| `TRUST_PROXY` | — | 有 nginx/Caddy 設 `1`；直連 LAN HTTP 設 `0` |
+| `ADMIN_PASSWORD` | — | 後台密碼（內網 IP + 登入） |
+| `ADMIN_JWT_SECRET` | 衍生 | session cookie 簽名 |
+| `ADMIN_SESSION_HOURS` | `24` | session 時效 |
+| `ADMIN_COOKIE_SECURE` | auto | HTTPS 自動 Secure；LAN HTTP 設 `0` |
+
+Dev only：`VITE_API_PROXY` / `VITE_PHOTO_PROXY`（預設 `http://127.0.0.1:8787`）
+
+## Admin
+
+| 來源 | `/admin` | `/api/admin/*` |
+|------|----------|----------------|
+| 內網 IP | 登入頁（可設密碼） | 需 session cookie |
+| 外網 | 302 → `/` | 302 → `/` |
+
+**功能：** 上傳 · 編輯 metadata · 重新命名 · 刪除 · 顯示方向 · 相簿顯示/隱藏 · 過濾（全部/顯示/隱藏）
+
+**Admin API**（內網 + cookie）：
+
+| Method | Path | 說明 |
+|--------|------|------|
+| `GET` | `/api/admin/access` | 存取狀態（含 `clientIp`） |
+| `POST` | `/api/admin/login` | 登入 |
+| `POST` | `/api/admin/logout` | 登出 |
+| `GET` | `/api/admin/photos` | 完整 catalog |
+| `POST` | `/api/admin/photos` | 上傳（`files`，最多 10 × 50MB） |
+| `PATCH` | `/api/admin/photos/:id` | 更新 name / date / annotation / displayOrientation / hidden |
+| `DELETE` | `/api/admin/photos/:id` | 刪除 |
 
 ## Public API
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/health` | Health check |
-| `GET` | `/api/photos/stats` | `{ total, months, latestDate, updatedAt }` |
-| `GET` | `/api/photos` | Paginated list — query: `page`, `limit` (max 50), `month` (`YYYY-MM` or `YYYY`), `year`, `q` (name search) |
-| `GET` | `/api/photos/:id` | Single photo with `prev` / `next` neighbors; pass the same `month` / `year` / `q` filters as the list endpoint so neighbors stay within the active filter |
-| `GET` | `/photos.json` | Legacy catalog (no `id` / `year` fields) |
-| `GET` | `/photos/*` | Static image files |
+| Method | Path | 說明 |
+|--------|------|------|
+| `GET` | `/api/health` | 健康檢查 |
+| `GET` | `/api/photos/stats` | 總數、月份統計（不含 hidden） |
+| `GET` | `/api/photos` | 分頁：`page` `limit` `month` `year` `q` |
+| `GET` | `/api/photos/:id` | 單張 + prev/next（filter 需與列表一致） |
+| `GET` | `/photos.json` | 舊版 flat catalog |
+| `GET` | `/photos/*` | 靜態圖片 |
 
-## Reverse proxy
+## Troubleshooting
 
-Point your reverse proxy at the Node process on `PORT` (default `8787`). The production server serves the built SPA from `client/dist/`, API routes under `/api`, and images under `/photos`.
+| 問題 | 處理 |
+|------|------|
+| 內網 `/admin` 被 redirect | `TRUST_PROXY=0`；查 `/api/admin/access` 的 `clientIp` |
+| 登入成功但 API 401 | LAN HTTP 時 cookie 勿用 `Secure` → `ADMIN_COOKIE_SECURE=0` 或確保非 HTTPS 自動加 Secure |
+| admin 設定重啟後消失 | 需新版 server；`sync-photos` 會保留 `hidden` 等欄位 |
+| 設定沒生效 | `npm run build` 後重啟；client + server 都要更新 |
+| Docker 目錄混亂 | `photos` 與 `data` 分開 volume |
+| 簡體字顯示不一致 | UI 用 Noto SC fallback；名稱用 LXGW WenKai Lite |
