@@ -12,10 +12,13 @@ import {
   uploadPhotos,
   type AdminAccessStatus,
 } from "../lib/adminApi";
-import { formatDateTime } from "../lib/format";
+import { formatDateTime, formatMonthLabel, photoLocalMonthKey } from "../lib/format";
 import { photoDisplayOrientationLabel } from "../lib/photoDisplay";
 import { PhotoThumb } from "../components/PhotoThumb";
+import { MonthFilter } from "../components/MonthFilter";
 import type { PhotoDisplayOrientation } from "../lib/photoDisplay";
+import { distributeToColumns } from "../lib/masonryColumns";
+import { useMasonryColumnCount } from "../hooks/useMasonryColumnCount";
 
 function formatDate(iso: string): string {
   return formatDateTime(iso);
@@ -87,6 +90,7 @@ export default function Admin() {
   const [dragOver, setDragOver] = useState(false);
   const [visibilityFilter, setVisibilityFilter] =
     useState<VisibilityFilter>("all");
+  const [monthFilter, setMonthFilter] = useState<string | null>(null);
 
   const visibilityCounts = useMemo(() => {
     const hidden = photos.filter((p) => p.hidden).length;
@@ -97,7 +101,9 @@ export default function Admin() {
     };
   }, [photos]);
 
-  const filteredPhotos = useMemo(() => {
+  const columnCount = useMasonryColumnCount();
+
+  const visibilityFilteredPhotos = useMemo(() => {
     if (visibilityFilter === "visible") {
       return photos.filter((p) => !p.hidden);
     }
@@ -106,6 +112,38 @@ export default function Admin() {
     }
     return photos;
   }, [photos, visibilityFilter]);
+
+  const monthStats = useMemo(() => {
+    const monthCounts = new Map<string, number>();
+    for (const photo of visibilityFilteredPhotos) {
+      const month = photoLocalMonthKey(photo.date);
+      monthCounts.set(month, (monthCounts.get(month) ?? 0) + 1);
+    }
+    return [...monthCounts.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([month, count]) => ({ month, count }));
+  }, [visibilityFilteredPhotos]);
+
+  useEffect(() => {
+    if (monthFilter && !monthStats.some((m) => m.month === monthFilter)) {
+      setMonthFilter(null);
+    }
+  }, [monthFilter, monthStats]);
+
+  const filteredPhotos = useMemo(() => {
+    let list = visibilityFilteredPhotos;
+    if (monthFilter) {
+      list = list.filter((p) => photoLocalMonthKey(p.date) === monthFilter);
+    }
+    return [...list].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  }, [visibilityFilteredPhotos, monthFilter]);
+
+  const photoColumns = useMemo(
+    () => distributeToColumns(filteredPhotos, columnCount),
+    [filteredPhotos, columnCount]
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -413,28 +451,37 @@ export default function Admin() {
         </section>
 
         {!loading && photos.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 font-ui">
-            <span className="text-xs text-muted mr-1">相簿顯示</span>
-            {(
-              [
-                ["all", `全部 (${visibilityCounts.total})`],
-                ["visible", `顯示 (${visibilityCounts.visible})`],
-                ["hidden", `隱藏 (${visibilityCounts.hidden})`],
-              ] as const
-            ).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setVisibilityFilter(value)}
-                className={`rounded-full border px-3 py-1.5 text-xs transition ${
-                  visibilityFilter === value
-                    ? "border-accent bg-accent/10 text-text"
-                    : "border-border text-muted hover:border-accent/40 hover:text-text"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2 font-ui">
+              <span className="text-xs text-muted mr-1">相簿顯示</span>
+              {(
+                [
+                  ["all", `全部 (${visibilityCounts.total})`],
+                  ["visible", `顯示 (${visibilityCounts.visible})`],
+                  ["hidden", `隱藏 (${visibilityCounts.hidden})`],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setVisibilityFilter(value)}
+                  className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                    visibilityFilter === value
+                      ? "border-accent bg-accent/10 text-text"
+                      : "border-border text-muted hover:border-accent/40 hover:text-text"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {monthStats.length > 0 && (
+              <MonthFilter
+                months={monthStats}
+                active={monthFilter}
+                onChange={setMonthFilter}
+              />
+            )}
           </div>
         )}
 
@@ -444,69 +491,84 @@ export default function Admin() {
           <p className="rounded-2xl border border-border bg-panel/60 px-6 py-12 text-center text-sm font-ui text-muted">
             {photos.length === 0
               ? "尚無照片"
-              : visibilityFilter === "hidden"
-                ? "沒有隱藏的相片"
-                : visibilityFilter === "visible"
-                  ? "沒有顯示中的相片"
-                  : "沒有符合條件的相片"}
+              : monthFilter
+                ? `${formatMonthLabel(monthFilter)} 沒有符合條件的相片`
+                : visibilityFilter === "hidden"
+                  ? "沒有隱藏的相片"
+                  : visibilityFilter === "visible"
+                    ? "沒有顯示中的相片"
+                    : "沒有符合條件的相片"}
           </p>
         ) : (
-          <div className="columns-1 gap-4 sm:columns-2 lg:columns-3">
-            {filteredPhotos.map((photo) => (
-              <article
-                key={photo.id}
-                className={`mb-4 break-inside-avoid rounded-2xl border bg-panel overflow-hidden shadow-sm ${
-                  photo.hidden
-                    ? "border-dashed border-muted/50 opacity-75"
-                    : "border-border"
-                }`}
+          <div className="flex items-start gap-4">
+            {photoColumns.map((columnPhotos, columnIndex) => (
+              <div
+                key={columnIndex}
+                className="flex min-w-0 flex-1 flex-col gap-4"
               >
-                <div className="relative bg-surface overflow-hidden">
-                  <PhotoThumb photo={photo} />
-                  {photo.hidden && (
-                    <span className="absolute right-2 top-2 rounded-md bg-void/90 px-2 py-0.5 text-xs font-ui text-muted shadow-sm">
-                      已隱藏
-                    </span>
-                  )}
-                </div>
-                <div className="p-4 space-y-2">
-                  <h2 className="font-ui font-medium text-text truncate" title={photo.name}>
-                    {photo.name}
-                  </h2>
-                  <p className="text-xs font-ui text-muted">
-                    {photo.hidden ? "隱藏 · " : "顯示 · "}
-                    {photoDisplayOrientationLabel(
-                      photo.width,
-                      photo.height,
-                      photo.displayOrientation
-                    )}
-                    {" · "}
-                    {formatDate(photo.date)}
-                    {photo.annotation?.world && (
-                      <span className="block truncate mt-0.5" title={photo.annotation.world}>
-                        {photo.annotation.world}
-                      </span>
-                    )}
-                  </p>
-                  <div className="flex gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(photo)}
-                      className="flex-1 rounded-lg border border-border px-3 py-1.5 text-xs font-ui text-text hover:bg-surface transition-colors"
-                    >
-                      編輯
-                    </button>
-                    <button
-                      type="button"
-                      disabled={deletingId === photo.id}
-                      onClick={() => handleDelete(photo)}
-                      className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-ui text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
-                    >
-                      {deletingId === photo.id ? "刪除中…" : "刪除"}
-                    </button>
-                  </div>
-                </div>
-              </article>
+                {columnPhotos.map((photo) => (
+                  <article
+                    key={photo.id}
+                    className={`rounded-2xl border bg-panel overflow-hidden shadow-sm ${
+                      photo.hidden
+                        ? "border-dashed border-muted/50 opacity-75"
+                        : "border-border"
+                    }`}
+                  >
+                    <div className="relative bg-surface overflow-hidden">
+                      <PhotoThumb photo={photo} />
+                      {photo.hidden && (
+                        <span className="absolute right-2 top-2 rounded-md bg-void/90 px-2 py-0.5 text-xs font-ui text-muted shadow-sm">
+                          已隱藏
+                        </span>
+                      )}
+                    </div>
+                    <div className="p-4 space-y-2">
+                      <h2
+                        className="font-ui font-medium text-text truncate"
+                        title={photo.name}
+                      >
+                        {photo.name}
+                      </h2>
+                      <p className="text-xs font-ui text-muted">
+                        {photo.hidden ? "隱藏 · " : "顯示 · "}
+                        {photoDisplayOrientationLabel(
+                          photo.width,
+                          photo.height,
+                          photo.displayOrientation
+                        )}
+                        {" · "}
+                        {formatDate(photo.date)}
+                        {photo.annotation?.world && (
+                          <span
+                            className="block truncate mt-0.5"
+                            title={photo.annotation.world}
+                          >
+                            {photo.annotation.world}
+                          </span>
+                        )}
+                      </p>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(photo)}
+                          className="flex-1 rounded-lg border border-border px-3 py-1.5 text-xs font-ui text-text hover:bg-surface transition-colors"
+                        >
+                          編輯
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deletingId === photo.id}
+                          onClick={() => handleDelete(photo)}
+                          className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-ui text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                        >
+                          {deletingId === photo.id ? "刪除中…" : "刪除"}
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
             ))}
           </div>
         )}

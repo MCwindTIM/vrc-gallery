@@ -10,7 +10,7 @@ npm workspaces monorepo (React + Express). Public gallery with month filter, lig
 
 - **Gallery** — masonry grid, infinite scroll, month filter (`?month=YYYY-MM`), lightbox (← → Esc / R rotate)
 - **Metadata** — XMP capture time, world, author, notes; `Asia/Taipei` grouping, 24-hour timestamps
-- **Admin** — drag-and-drop upload, edit, rename, delete; display orientation; gallery visibility filter
+- **Admin** — drag-and-drop upload, edit, rename, delete; display orientation; ordered masonry grid (newest top-left); visibility + month filters (`YYYY-MM`)
 - **Sync** — scans `photos/`, WebP thumbnails, `photos.json`; skips non-images
 
 ## Stack
@@ -146,7 +146,7 @@ Dev only: `VITE_API_PROXY` / `VITE_PHOTO_PROXY` (default `http://127.0.0.1:8787`
 | Private IP | login UI | session cookie required |
 | Public IP | 302 → `/` | 302 → `/` |
 
-**Features:** upload · edit metadata · rename · delete · orientation · show/hide · visibility filter
+**Features:** upload · edit metadata · rename · delete · orientation · show/hide · visibility filter · month filter · ordered masonry (newest → oldest, left-to-right)
 
 | Method | Path | Description |
 |--------|------|-------------|
