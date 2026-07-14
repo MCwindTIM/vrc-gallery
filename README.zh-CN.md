@@ -2,7 +2,7 @@
 
 VRChat 照片相册 — [vrc.mcwind.cloud](https://vrc.mcwind.cloud)
 
-**语言：** [English](README.md) · [繁體中文](README.zh-TW.md)
+**语言：** [English](README.md) · [繁體中文](README.zh-TW.md) · [日文](README.zh-TW.md)
 
 npm workspaces monorepo（React + Express）。公开相册含月份筛选、灯箱、VRChat 元数据；内网 `/admin` 管理上传、编辑、显示方向、显示/隐藏。
 
