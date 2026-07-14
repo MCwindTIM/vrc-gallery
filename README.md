@@ -2,7 +2,7 @@
 
 VRChat photo gallery — [vrc.mcwind.cloud](https://vrc.mcwind.cloud)
 
-**Languages:** [繁體中文](README.zh-TW.md) · [简体中文](README.zh-CN.md)
+**Languages:** [繁體中文](README.zh-TW.md) · [简体中文](README.zh-CN.md) · [日文](README.jp.md)
 
 npm workspaces monorepo (React + Express). Public gallery with month filter, lightbox, and VRChat metadata. Internal `/admin` for upload, edit, orientation, and show/hide.
 
