@@ -12,6 +12,8 @@ import { warnIfAdminAuthMisconfigured } from "./lib/adminAuth.js";
 
 const PORT = Number(process.env.PORT) || 8787;
 const app = express();
+// L1 fix: hide framework fingerprint
+app.disable("x-powered-by");
 
 if (process.env.TRUST_PROXY === "1" || process.env.TRUST_PROXY === "true") {
   app.set("trust proxy", true);

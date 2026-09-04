@@ -25,6 +25,44 @@ function safeBasename(name: string): string {
   return base;
 }
 
+/**
+ * Display-name validation for admin rename (H1 fix).
+ * Blocks path separators / traversal so a crafted `name` cannot move a
+ * photo outside PHOTOS_DIR via path.join.
+ */
+function validateDisplayName(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("Name cannot be empty");
+  if (
+    trimmed.includes("/") ||
+    trimmed.includes("\\") ||
+    trimmed.includes("\0")
+  ) {
+    throw new Error("Invalid name");
+  }
+  if (trimmed === "." || trimmed === "..") {
+    throw new Error("Invalid name");
+  }
+  return trimmed;
+}
+
+/** Like fs.rename but falls back to copy+unlink across devices (EXDEV). */
+async function renameAcrossDevices(from: string, to: string): Promise<void> {
+  try {
+    await fs.rename(from, to);
+  } catch (err) {
+    if (!(err instanceof Error && "code" in err && err.code === "EXDEV")) {
+      throw err;
+    }
+    await fs.copyFile(from, to);
+    await fs.unlink(from).catch(() => {});
+  }
+}
+
+function isErrno(err: unknown, code: string): boolean {
+  return err instanceof Error && "code" in err && err.code === code;
+}
+
 function photoPaths(photo: PhotoRecord) {
   const file = path.basename(photo.url);
   const thumb = path.basename(photo.thumb);
@@ -65,6 +103,60 @@ async function buildRecordFromFile(filename: string): Promise<PhotoRecord> {
   };
 }
 
+/**
+ * H2 fix: consume an already-staged upload (written by multer to a TEMP dir)
+ * and move it into PHOTOS_DIR only after validation, so a same-name upload can
+ * never overwrite or delete an existing original.
+ * - duplicate id in catalog  -> error, staged file untouched
+ * - file already on disk     -> error (never overwrite existing original)
+ * - corrupt / non-image body -> error before any move
+ * On any post-move failure the just-created final file is removed again.
+ */
+export async function ingestStagedUpload(
+  stagedPath: string,
+  originalFilename: string
+): Promise<PhotoRecord> {
+  const safe = safeBasename(originalFilename);
+  if (!isPhotoFilename(safe)) {
+    throw new Error("Skipped non-image file");
+  }
+
+  const id = idFromFilename(safe);
+  const finalPath = path.join(PHOTOS_DIR, safe);
+
+  const catalog = await loadCatalog();
+  if (catalog.photos.some((p) => p.id === id)) {
+    throw new Error("A photo with this filename already exists");
+  }
+  try {
+    await fs.access(finalPath);
+    // existing file that is NOT in the catalog — still refuse to overwrite
+    throw new Error("A photo with this filename already exists");
+  } catch (err) {
+    if (!isErrno(err, "ENOENT")) {
+      throw new Error("A photo with this filename already exists");
+    }
+  }
+
+  // Validate content BEFORE touching the destination (rejects fake/corrupt files)
+  await sharp(stagedPath).metadata();
+
+  const thumbFs = path.join(PHOTOS_DIR, "thumbs", thumbFilename(id));
+  await renameAcrossDevices(stagedPath, finalPath);
+  try {
+    const record = await buildRecordFromFile(safe);
+    const photos = [record, ...catalog.photos];
+    await saveCatalog(photos);
+    return record;
+  } catch (err) {
+    // roll back only files we just placed (they did not exist before)
+    await fs.unlink(finalPath).catch(() => {});
+    await fs.unlink(thumbFs).catch(() => {});
+    throw err;
+  }
+}
+
+/** Legacy alias kept for compatibility; requires the file already in PHOTOS_DIR. */
 export async function ingestUploadedFile(
   filename: string
 ): Promise<PhotoRecord> {
@@ -105,8 +197,7 @@ export async function updatePhoto(
   let updated = { ...current };
 
   if (input.name !== undefined) {
-    const trimmed = input.name.trim();
-    if (!trimmed) throw new Error("Name cannot be empty");
+    const trimmed = validateDisplayName(input.name);
 
     if (trimmed !== current.name) {
       const ext = path.extname(path.basename(current.url));
@@ -119,10 +210,20 @@ export async function updatePhoto(
       if (catalog.photos.some((p) => p.id === trimmed && p.id !== id)) {
         throw new Error("A photo with this name already exists");
       }
-
-      await fs.rename(src, newSrc);
+      // Refuse to clobber an on-disk file that isn't in the catalog.
       try {
-        await fs.rename(thumb, newThumb);
+        await fs.access(newSrc);
+        throw new Error("A photo with this name already exists");
+      } catch (err) {
+        if (!isErrno(err, "ENOENT")) {
+          throw new Error("A photo with this name already exists");
+        }
+      }
+
+      // Move original first; if the thumb move fails we regenerate it.
+      await renameAcrossDevices(src, newSrc);
+      try {
+        await renameAcrossDevices(thumb, newThumb);
       } catch {
         await ensureThumb(newSrc, newThumb);
       }
